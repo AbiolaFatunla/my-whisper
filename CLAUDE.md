@@ -1,5 +1,75 @@
 # CLAUDE.md - Project Instructions
 
+---
+
+## ⛔ MANDATORY RULES — DO NOT SKIP
+
+These rules are **non-negotiable** and must be followed without exception. Violating these rules is a critical failure.
+
+### RULE 1: Always Use `progress.txt`
+
+```
+🚨 CRITICAL: You MUST read and update progress.txt
+```
+
+**AT THE START of every session:**
+- [ ] Read `progress.txt` FIRST before doing anything else
+- [ ] Understand what was completed and what's pending
+
+**DURING work:**
+- [ ] Update `progress.txt` after EVERY notable task completion
+- [ ] Do NOT batch updates — write immediately after each task
+
+**FORMAT:**
+- Use checkboxes: `- [x]` for done, `- [ ]` for pending
+- Keep entries SHORT (1 line per item)
+- Include dates for major milestones
+
+**WHY:** This file persists across context windows. Without it, work gets repeated or lost.
+
+---
+
+### RULE 2: Always Use My Voice for Non-Code Content
+
+```
+🚨 CRITICAL: You MUST use the `abiolas-voice` skill for ALL non-code writing
+```
+
+**APPLIES TO:**
+- README files
+- Documentation (*.md files)
+- Commit messages
+- PR descriptions
+- Comments to users
+- Any prose that represents me
+
+**HOW:**
+1. Before writing non-code content, invoke the `abiolas-voice` skill
+2. Apply the voice/tone/style from that skill
+3. Write in first person where appropriate
+
+**DOES NOT APPLY TO:**
+- Code files (*.js, *.css, *.html, etc.)
+- Configuration files (*.yml, *.json, etc.)
+- Inline code comments (these should be technical)
+
+**WHY:** This is my project and my public presence. All writing must sound like me, not like a generic AI.
+
+---
+
+### RULE 3: Never Use Claude/Anthropic Attribution
+
+```
+🚨 CRITICAL: NEVER attribute work to Claude or Anthropic
+```
+
+- **NEVER** include "Co-Authored-By: Claude" in commits
+- **NEVER** include AI attribution footers
+- **ALWAYS** use **Abiola Fatunla** as the author
+- Keep commit messages clean and professional
+
+---
+
 ## Project Overview
 
 You are building **My Whisper** — a personal voice dictation app with AI-powered transcription and personalization (learning from corrections).
@@ -42,10 +112,9 @@ Before writing any code, read `planning/UNIFIED_SPEC.md` completely. It contains
 - The goal is a fresh, clean implementation that incorporates the existing functionality
 
 ### 3. Use progress.txt
-- Update `progress.txt` after completing each phase or major task
-- This file persists across context windows
-- Read it at the start of each session to know where you left off
-- Format: checkboxes for tasks, notes for context
+⚠️ **See MANDATORY RULE 1 above** — this is non-negotiable.
+
+Summary: Read at session start, update after every task, keep entries short.
 
 ### 4. External Services
 
@@ -117,21 +186,6 @@ After each phase, manually test:
 4. Can I edit and save? (Phase 3)
 5. Do corrections auto-apply? (Phase 4)
 6. Can I sign in with Google? (Phase 5)
-
-## Authorship & Voice
-
-### Git Commits & Attribution
-- **NEVER** use Anthropic or Claude attribution in commits
-- **NEVER** include "Co-Authored-By: Claude" or similar
-- Always use **Abiola Fatunla** as the author
-- Keep commit messages clean and professional
-
-### Writing Style
-- For non-code content (documentation, commit messages, README, etc.), use the `abiolas-voice` skill
-- Write in first person where appropriate
-- Match the tone and style defined in the voice skill
-
----
 
 ## Notes
 

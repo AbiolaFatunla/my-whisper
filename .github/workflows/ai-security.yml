@@ -1,0 +1,127 @@
+# AI/LLM Security Review
+# Specifically checks for AI-related security vulnerabilities
+# Reference: OWASP LLM Top 10 (https://genai.owasp.org/)
+
+name: AI Security Review
+
+on:
+  pull_request:
+    paths:
+      # Trigger on files that likely contain AI/LLM code
+      - '**/*whisper*'
+      - '**/*transcri*'
+      - '**/*openai*'
+      - '**/*prompt*'
+      - '**/*ai*'
+      - '**/*llm*'
+      - '**/server.js'
+      - '**/api/**'
+  push:
+    branches: [main]
+    paths:
+      - '**/*whisper*'
+      - '**/*transcri*'
+      - '**/*openai*'
+      - '**/*prompt*'
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  ai-security-check:
+    name: AI/LLM Security Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Static check for common AI security issues
+      - name: Check for AI Security Anti-Patterns
+        run: |
+          echo "## AI Security Anti-Pattern Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for user input directly in prompts (prompt injection risk)
+          echo "### Checking for potential prompt injection vulnerabilities..." >> $GITHUB_STEP_SUMMARY
+          if grep -rn "prompt.*\${" --include="*.js" --include="*.ts" app/ 2>/dev/null; then
+            echo "WARNING: Found template literals in prompts - review for injection risks" >> $GITHUB_STEP_SUMMARY
+          else
+            echo " No obvious prompt injection patterns found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for hardcoded API keys
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Checking for hardcoded API keys..." >> $GITHUB_STEP_SUMMARY
+          if grep -rn "sk-[a-zA-Z0-9]" --include="*.js" --include="*.ts" app/ 2>/dev/null | grep -v "process.env"; then
+            echo "CRITICAL: Found potential hardcoded OpenAI API key!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo " No hardcoded API keys found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for proper error handling with AI responses
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Checking for AI response handling..." >> $GITHUB_STEP_SUMMARY
+          if grep -rn "\.data\." --include="*.js" --include="*.ts" app/ 2>/dev/null | head -5; then
+            echo "INFO: AI response data access found - ensure proper validation" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "Reference: [OWASP LLM Top 10](https://genai.owasp.org/)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Claude AI Security Deep Review
+        if: github.event_name == 'pull_request'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Perform an AI/LLM-specific security review based on the OWASP LLM Top 10:
+
+            ## LLM01: Prompt Injection
+            - Is user input sanitized before being included in prompts?
+            - Are there clear boundaries between system prompts and user input?
+            - Could an attacker manipulate the AI's behavior through crafted input?
+
+            ## LLM02: Insecure Output Handling
+            - Is AI-generated output validated before use?
+            - Could AI output be used to execute code or commands?
+            - Is output properly escaped before display?
+
+            ## LLM03: Training Data Poisoning
+            - (N/A for this app - using pre-trained Whisper)
+
+            ## LLM04: Model Denial of Service
+            - Are there rate limits on AI API calls?
+            - Are input sizes bounded to prevent resource exhaustion?
+
+            ## LLM05: Supply Chain Vulnerabilities
+            - Are AI/ML dependencies from trusted sources?
+            - Are API integrations secured with proper authentication?
+
+            ## LLM06: Sensitive Information Disclosure
+            - Could the AI expose sensitive data in responses?
+            - Are transcriptions properly protected?
+
+            ## LLM07: Insecure Plugin Design
+            - (Check if any AI plugins/extensions are used)
+
+            ## LLM08: Excessive Agency
+            - What actions can the AI take? Are they appropriately limited?
+
+            ## LLM09: Overreliance
+            - Are there human-in-the-loop controls where needed?
+
+            ## LLM10: Model Theft
+            - Are API keys properly protected?
+            - Is there logging of API usage for anomaly detection?
+
+            Provide specific findings with line numbers and remediation steps.

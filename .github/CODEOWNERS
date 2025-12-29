@@ -1,0 +1,26 @@
+# CODEOWNERS - Require reviews for sensitive paths
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @abiolafatunla
+
+# Security-sensitive files require explicit review
+.env* @abiolafatunla
+**/config/** @abiolafatunla
+**/*secret* @abiolafatunla
+**/*credential* @abiolafatunla
+**/*auth* @abiolafatunla
+
+# CI/CD pipeline changes require review
+.github/** @abiolafatunla
+
+# Server-side code (handles API keys, database)
+app/server.js @abiolafatunla
+app/routes/** @abiolafatunla
+app/middleware/** @abiolafatunla
+
+# Infrastructure and deployment
+Dockerfile @abiolafatunla
+docker-compose* @abiolafatunla
+*.yaml @abiolafatunla
+*.yml @abiolafatunla

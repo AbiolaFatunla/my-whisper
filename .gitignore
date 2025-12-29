@@ -5,7 +5,8 @@ node_modules/
 .env
 .env.local
 .env.*.local
-*.env
+# Note: .env.example should be committed (template for developers)
+!.env.example
 
 # Planning and reference folders (not part of main app)
 planning/

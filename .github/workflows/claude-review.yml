@@ -1,0 +1,124 @@
+# Claude Code AI Review
+# AI-powered code review using Anthropic's Claude
+
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+    # Only run on PRs or when @claude is mentioned
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are reviewing code for My Whisper, a voice dictation app with AI transcription.
+
+            Please review this pull request for:
+
+            ## Security (High Priority)
+            - [ ] Hardcoded secrets, API keys, or credentials
+            - [ ] SQL injection vulnerabilities
+            - [ ] XSS (Cross-Site Scripting) vulnerabilities
+            - [ ] Command injection risks
+            - [ ] Insecure handling of user input
+            - [ ] Prompt injection vulnerabilities (for AI/LLM code)
+            - [ ] Exposed sensitive data in logs or errors
+
+            ## Code Quality
+            - [ ] Clear and maintainable code structure
+            - [ ] Proper error handling
+            - [ ] Edge cases covered
+            - [ ] No obvious performance issues
+
+            ## Best Practices
+            - [ ] Follows existing code patterns in the codebase
+            - [ ] Appropriate use of async/await
+            - [ ] Input validation present where needed
+
+            Provide specific, actionable feedback. Reference line numbers when pointing out issues.
+
+  # Security-focused review for sensitive files
+  security-review:
+    name: Security-Focused Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for sensitive file changes
+        id: check-files
+        run: |
+          # List of sensitive file patterns
+          SENSITIVE_PATTERNS="\.env|config|secret|credential|password|key|token|auth"
+
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
+
+          # Check if any sensitive files changed
+          if echo "$CHANGED_FILES" | grep -iE "$SENSITIVE_PATTERNS"; then
+            echo "sensitive=true" >> $GITHUB_OUTPUT
+          else
+            echo "sensitive=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Claude Security Review
+        if: steps.check-files.outputs.sensitive == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            SECURITY ALERT: This PR modifies sensitive files.
+
+            Perform an in-depth security review focusing on:
+
+            1. **Credential Safety**
+               - Are any secrets hardcoded?
+               - Are environment variables used correctly?
+               - Is there any accidental exposure of sensitive data?
+
+            2. **Configuration Security**
+               - Are default values secure?
+               - Are there any overly permissive settings?
+
+            3. **OWASP Top 10** (reference: https://owasp.org/www-project-top-ten/)
+               - Check for common vulnerabilities
+
+            4. **AI/LLM Security** (if applicable)
+               - Prompt injection risks
+               - Unsafe handling of AI-generated content
+
+            Be thorough - this review gates sensitive changes.

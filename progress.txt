@@ -5,7 +5,45 @@ Current Phase: Phase 1 - Database Integration (In Progress)
 
 ---
 
-## UI/Theme Updates (Latest Session - Dec 29, 2025)
+## CI/CD & Security Pipeline (Dec 29, 2025)
+
+### GitHub Actions Workflows Created
+- [x] ci.yml - Build, test, lint + smoke test
+- [x] codeql.yml - GitHub's SAST (weekly + on push)
+- [x] secrets-scan.yml - Gitleaks for credential detection
+- [x] trivy.yml - Dependency + IaC scanning (daily + on push)
+- [x] claude-review.yml - AI-powered code review (PRs)
+- [x] ai-security.yml - OWASP LLM Top 10 checks
+
+### Security Configuration
+- [x] dependabot.yml - Auto dependency updates (weekly)
+- [x] CODEOWNERS - Require reviews for sensitive files
+- [x] SECURITY.md - Security policy
+- [x] BRANCH_PROTECTION.md - Setup guide
+
+### Project Documentation
+- [x] README.md with security badges (needs voice rewrite)
+- [x] app/.env.example - Environment variable template
+- [x] Updated .gitignore to include .env.example
+
+### CLAUDE.md Updates
+- [x] Added MANDATORY RULES section at top
+- [x] RULE 1: progress.txt usage (non-negotiable)
+- [x] RULE 2: abiolas-voice skill for non-code content
+- [x] RULE 3: No Claude/Anthropic attribution
+
+### Voice Rewrites Completed
+- [x] Rewrite README.md using abiolas-voice skill
+- [x] Rewrite SECURITY.md using abiolas-voice skill
+
+### Pending (User Actions)
+- [ ] Add ANTHROPIC_API_KEY to GitHub Secrets
+- [ ] Configure branch protection in GitHub UI (see .github/BRANCH_PROTECTION.md)
+- [ ] Push CI/CD changes to GitHub
+
+---
+
+## UI/Theme Updates (Earlier - Dec 29, 2025)
 
 ### Color Scheme: Sunset Warmth Theme Applied
 - [x] Replaced purple/blue scheme with warm orange/coral/pink palette
@@ -26,7 +64,11 @@ Current Phase: Phase 1 - Database Integration (In Progress)
 - [x] Inlined SVG for CSS theme control
 - [x] Light mode: `#7c2d12` (warm brown-orange)
 - [x] Dark mode: `#fed7aa` (warm peach)
-- [x] Browser favicon unchanged (black/white for visibility)
+
+### Git/GitHub Setup
+- [x] Initialized Git repo
+- [x] Created .gitignore (excludes planning/, voice-recording-app-main/, .env, personal files)
+- [x] Pushed to GitHub: AbiolaFatunla/my-whisper (private)
 
 ---
 

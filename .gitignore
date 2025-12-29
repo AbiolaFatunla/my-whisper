@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Planning and reference folders (not part of main app)
+planning/
+voice-recording-app-main/
+
+# Local/personal config files
+.mcp.json
+.claude/
+*.skill
+abiolas-voice.skill
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Build outputs
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# AWS credentials (if stored as files)
+*.pem
+credentials.csv
+
+# Preview files (development only)
+**/preview-*.html

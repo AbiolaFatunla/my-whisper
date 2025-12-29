@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 1140 1084" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-miterlimit:10;">
+  <style>
+    /*
+     * Dark OS theme (default) - Light colored logo
+     */
+    .logo-arc { fill: #ffffff; }
+    .logo-a-shape { fill: #ffffff; stroke: #0B0F19; stroke-width: 20.83px; }
+
+    /*
+     * Light OS theme - Dark colored logo
+     */
+    @media (prefers-color-scheme: light) {
+      .logo-arc { fill: #231f20; }
+      .logo-a-shape { fill: #231f20; stroke: #ffffff; stroke-width: 20.83px; }
+    }
+  </style>
+  <!-- Arc/smile shape at bottom -->
+  <path d="M778.209,800.636c-51.535,59.252 -127.466,96.733 -212.082,96.733c-82.396,0 -156.556,-35.54 -207.975,-92.114l32.115,-55.625c40.315,53.099 104.111,87.414 175.859,87.414c74.045,0 139.62,-36.547 179.658,-92.57l32.424,56.161Z" class="logo-arc"/>
+  <!-- The "A" shape -->
+  <path d="M569.517,439.166l-311.837,540.11l-152.994,-88.332l448.51,-776.833l16.324,-9.425l16.337,9.432l448.494,776.825l-153.004,88.336l-311.83,-540.113Z" class="logo-a-shape"/>
+</svg>

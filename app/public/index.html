@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Personal voice dictation with AI transcription that learns from your corrections">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>My Whisper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="light">
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="brand-group">
+                <h1 class="app-title">
+                    <!-- Brand Logo - Inline SVG for theme control -->
+                    <svg class="brand-logo" width="42" height="42" viewBox="0 0 1140 1084" xmlns="http://www.w3.org/2000/svg" aria-label="My Whisper logo">
+                        <path class="logo-arc" d="M778.209,800.636c-51.535,59.252 -127.466,96.733 -212.082,96.733c-82.396,0 -156.556,-35.54 -207.975,-92.114l32.115,-55.625c40.315,53.099 104.111,87.414 175.859,87.414c74.045,0 139.62,-36.547 179.658,-92.57l32.424,56.161Z"/>
+                        <path class="logo-a-shape" d="M569.517,439.166l-311.837,540.11l-152.994,-88.332l448.51,-776.833l16.324,-9.425l16.337,9.432l448.494,776.825l-153.004,88.336l-311.83,-540.113Z"/>
+                    </svg>
+                    <span class="app-title-text">My Whisper</span>
+                </h1>
+                <p class="app-subtitle">Personal voice dictation that learns from you.</p>
+            </div>
+            <div class="header-controls">
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+                    <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="layout-grid">
+            <!-- Recording Section -->
+            <section class="recording-section">
+                <div class="recorder-card">
+                    <div class="visualizer-container" id="visualizerContainer">
+                        <canvas id="visualizer" width="300" height="100"></canvas>
+                    </div>
+
+                    <div class="recording-info">
+                        <div class="recording-status" id="recordingStatus">Ready to record</div>
+                        <div class="recording-time" id="recordingTime">00:00</div>
+                    </div>
+
+                    <div class="record-button-shell">
+                        <div class="record-button-ring"></div>
+                        <button class="record-button" id="recordButton" aria-label="Start recording">
+                            <!-- Abstract Sound Wave Microphone Icon -->
+                            <svg class="mic-svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                <style>
+                                    .mic-body { fill: white; }
+                                    .sound-wave { stroke: white; stroke-width: 2; fill: none; opacity: 0.7; stroke-linecap: round; }
+                                    .wave-1 { animation: waveAnimate 1.5s ease-in-out infinite; }
+                                    .wave-2 { animation: waveAnimate 1.5s ease-in-out infinite 0.2s; }
+                                    .wave-3 { animation: waveAnimate 1.5s ease-in-out infinite 0.4s; }
+                                    @keyframes waveAnimate {
+                                        0%, 100% { opacity: 0.3; transform: translateX(0); }
+                                        50% { opacity: 0.9; transform: translateX(2px); }
+                                    }
+                                </style>
+                                <!-- Microphone body -->
+                                <rect class="mic-body" x="18" y="6" width="12" height="22" rx="6"/>
+                                <!-- Microphone base arc -->
+                                <path class="sound-wave" d="M12 24 Q12 36 24 36 Q36 36 36 24" stroke-width="2.5"/>
+                                <!-- Stand -->
+                                <line x1="24" y1="36" x2="24" y2="42" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                                <line x1="18" y1="42" x2="30" y2="42" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                                <!-- Sound waves -->
+                                <path class="sound-wave wave-1" d="M38 14 Q42 20 38 26"/>
+                                <path class="sound-wave wave-2" d="M42 12 Q48 20 42 28"/>
+                                <path class="sound-wave wave-3" d="M46 10 Q54 20 46 30"/>
+                            </svg>
+                            <svg class="stop-svg" width="48" height="48" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="record-hint">Tap to start capturing. Whisper handles transcription automatically.</p>
+
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">Uploading... 0%</div>
+                    </div>
+
+                    <div class="error-message" id="errorMessage" style="display: none;"></div>
+
+                    <!-- Transcription Section -->
+                    <div class="transcription-section" id="transcriptionSection" style="display: none;">
+                        <div class="transcription-header">
+                            <h3>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                </svg>
+                                Transcription
+                                <span class="ai-badge">AI Powered</span>
+                            </h3>
+                            <div class="transcription-title" id="transcriptionTitle" style="display: none;">
+                                <span class="title-label">Title:</span>
+                                <span class="title-text"></span>
+                            </div>
+                        </div>
+
+                        <div class="transcription-loading" id="transcriptionLoading">
+                            <div class="transcription-spinner"></div>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 4px;">Transcribing audio...</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">Using OpenAI Whisper</div>
+                            </div>
+                        </div>
+
+                        <div class="transcription-text" id="transcriptionText" style="display: none;"></div>
+
+                        <div class="transcription-actions" id="transcriptionActions" style="display: none;">
+                            <button class="transcription-btn" id="copyTranscriptionBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy
+                            </button>
+                            <button class="transcription-btn" id="downloadTranscriptionBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Download
+                            </button>
+                        </div>
+
+                        <p class="transcription-note" id="transcriptionNote" style="display: none;">
+                            Saved to your history
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Audio Player Modal -->
+    <div class="modal" id="playerModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="playerTitle">Recording</h3>
+                <button class="close-button" id="closePlayer" aria-label="Close player">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="player-container">
+                <audio id="audioPlayer" preload="metadata" controls style="width: 100%;"></audio>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast" style="display: none;"></div>
+
+    <!-- Scripts -->
+    <script src="recorder.js"></script>
+    <script src="uploader.js"></script>
+    <script src="player.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

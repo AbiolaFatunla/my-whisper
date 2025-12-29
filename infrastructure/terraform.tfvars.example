@@ -1,0 +1,19 @@
+# Example terraform.tfvars - Copy to terraform.tfvars and fill in values
+# DO NOT commit terraform.tfvars to git (contains secrets)
+
+aws_region  = "eu-west-2"
+aws_profile = "abiola-cli"
+environment = "prod"
+
+# S3 bucket for audio files
+audio_bucket_name    = "abiola-whisper-audio"
+audio_retention_days = 90
+
+# Lambda configuration
+lambda_memory  = 512
+lambda_timeout = 30
+
+# Application secrets
+openai_api_key    = "sk-your-openai-api-key"
+supabase_url      = "https://your-project.supabase.co"
+supabase_anon_key = "your-supabase-anon-key"

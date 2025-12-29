@@ -49,8 +49,8 @@ app.use(express.static('public', {
 
 // AWS Configuration
 let s3Client;
-const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'voice-recording-app';
-const REGION = process.env.AWS_REGION || 'us-east-1';
+const BUCKET_NAME = process.env.AUDIO_BUCKET || process.env.S3_BUCKET_NAME || 'voice-recording-app';
+const REGION = process.env.AWS_REGION || 'eu-west-2';
 
 // OpenAI Configuration
 const DEFAULT_TITLE_MODEL = process.env.OPENAI_TITLE_MODEL || 'gpt-4o-mini';
@@ -423,15 +423,17 @@ app.get('/api/audio-proxy', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`\n🎙️  My Whisper Server`);
-  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log(`🌐 Server running at: http://localhost:${PORT}`);
-  console.log(`📦 S3 Bucket: ${BUCKET_NAME}`);
-  console.log(`🌍 Region: ${REGION}`);
-  console.log(`✓ Ready to accept requests`);
-  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-});
+// Start server (only when running directly, not in Lambda)
+if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  app.listen(PORT, () => {
+    console.log(`\n My Whisper Server`);
+    console.log(`--------------------------------------------`);
+    console.log(`Server running at: http://localhost:${PORT}`);
+    console.log(`S3 Bucket: ${BUCKET_NAME}`);
+    console.log(`Region: ${REGION}`);
+    console.log(`Ready to accept requests`);
+    console.log(`--------------------------------------------\n`);
+  });
+}
 
 module.exports = app;

@@ -48,6 +48,17 @@ temp/
 *.pem
 credentials.csv
 
+# Terraform
+infrastructure/.terraform/
+infrastructure/*.tfstate
+infrastructure/*.tfstate.*
+infrastructure/*.tfvars
+infrastructure/*.tfvars.json
+!infrastructure/terraform.tfvars.example
+infrastructure/.terraform.lock.hcl
+infrastructure/lambda_placeholder.zip
+lambda-package.zip
+
 # Preview files (development only)
 **/preview-*.html
 

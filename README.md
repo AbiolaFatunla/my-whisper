@@ -7,6 +7,9 @@ A personal voice dictation app with AI-powered transcription that learns from my
 [![CodeQL](https://github.com/abiolafatunla/my-whisper/actions/workflows/codeql.yml/badge.svg)](https://github.com/abiolafatunla/my-whisper/actions/workflows/codeql.yml)
 [![Trivy Security Scan](https://github.com/abiolafatunla/my-whisper/actions/workflows/trivy.yml/badge.svg)](https://github.com/abiolafatunla/my-whisper/actions/workflows/trivy.yml)
 [![Secrets Detection](https://github.com/abiolafatunla/my-whisper/actions/workflows/secrets-scan.yml/badge.svg)](https://github.com/abiolafatunla/my-whisper/actions/workflows/secrets-scan.yml)
+![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)
+
+> **Portfolio Project** - This code is shared for evaluation purposes only (job applications, interviews, professional assessment). Not open source. See [LICENSE](LICENSE) for terms.
 
 ## What This Is
 
@@ -130,7 +133,9 @@ All PRs go through automated security scanning (CodeQL, Trivy, Gitleaks) and AI-
 
 ## Licence
 
-ISC
+© 2025 Abiola Fatunla. All rights reserved.
+
+This repository is shared for evaluation purposes only. Copying, modification, distribution, or use of this code is not permitted without explicit written permission. See [LICENSE](LICENSE) for full terms.
 
 ---
 

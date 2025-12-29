@@ -1,0 +1,13 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "My Whisper gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow Supabase anon key in frontend config (anon keys are designed for public use with RLS)"
+paths = [
+    '''app/public/config\.js'''
+]

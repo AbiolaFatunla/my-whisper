@@ -175,7 +175,7 @@ async function transcribeAudio(audioUrl) {
     hideUploadProgress();
     showTranscriptionLoading();
 
-    const response = await fetch('/api/transcribe', {
+    const response = await fetch(`${config.apiUrl}/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileUrl: audioUrl })

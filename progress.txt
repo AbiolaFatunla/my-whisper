@@ -36,10 +36,13 @@ Current Phase: Phase 1 - Database Integration (In Progress)
 - [x] Rewrite README.md using abiolas-voice skill
 - [x] Rewrite SECURITY.md using abiolas-voice skill
 
+### Completed
+- [x] Push CI/CD changes to GitHub
+- [x] Fixed git config to use personal email (ftnlabiola@gmail.com)
+
 ### Pending (User Actions)
 - [ ] Add ANTHROPIC_API_KEY to GitHub Secrets
 - [ ] Configure branch protection in GitHub UI (see .github/BRANCH_PROTECTION.md)
-- [ ] Push CI/CD changes to GitHub
 
 ---
 

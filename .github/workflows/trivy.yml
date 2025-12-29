@@ -6,6 +6,8 @@ name: Trivy Security Scan
 on:
   push:
     branches: [main]
+    branches-ignore:
+      - 'dependabot/**'  # Dependabot pushes trigger pull_request instead
   pull_request:
     branches: [main]
   schedule:
@@ -15,6 +17,7 @@ on:
 permissions:
   contents: read
   security-events: write
+  pull-requests: read  # Required for Dependabot PRs
 
 jobs:
   trivy-scan:

@@ -16,11 +16,11 @@ The app uses OpenAI's Whisper API for transcription, Supabase for data persisten
 
 ## Features
 
-- **Voice Recording** — Real-time waveform visualisation during recording
-- **AI Transcription** — Powered by OpenAI Whisper
-- **Personalisation** — Learns from corrections and applies them automatically
-- **History** — Browse and search past transcriptions
-- **Authentication** — Google OAuth via Supabase
+- **Voice Recording** - Real-time waveform visualisation during recording
+- **AI Transcription** - Powered by OpenAI Whisper
+- **Personalisation** - Learns from corrections and applies them automatically
+- **History** - Browse and search past transcriptions
+- **Authentication** - Google OAuth via Supabase
 
 ## Tech Stack
 

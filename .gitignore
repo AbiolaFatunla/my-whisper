@@ -50,3 +50,9 @@ credentials.csv
 
 # Preview files (development only)
 **/preview-*.html
+
+# Personal/internal docs (not for GitHub)
+LESSONS_LEARNED_CICD.md
+CLAUDE.md
+SETUP_BEFORE_BUILD.md
+progress.txt

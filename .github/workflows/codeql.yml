@@ -45,7 +45,9 @@ jobs:
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
+      # Note: SARIF upload requires Code Scanning enabled (free for public repos)
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        continue-on-error: true  # Don't fail if Code Scanning not enabled
         with:
           category: "/language:javascript-typescript"

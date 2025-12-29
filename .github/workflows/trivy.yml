@@ -54,6 +54,23 @@ jobs:
           sarif_file: 'trivy-fs-results.sarif'
           category: 'trivy-filesystem'
 
+      # Generate SBOM (Software Bill of Materials) in CycloneDX format
+      - name: Generate SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'cyclonedx'
+          output: 'sbom-cyclonedx.json'
+
+      # Upload SBOM as artifact
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom-cyclonedx.json
+          retention-days: 90
+
       # Scan for exposed secrets (backup to Gitleaks)
       - name: Trivy Secret Scan
         uses: aquasecurity/trivy-action@master

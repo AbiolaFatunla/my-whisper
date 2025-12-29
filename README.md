@@ -66,9 +66,11 @@ I've set up a proper CI/CD pipeline with multiple layers of security scanning. T
 |-------|------|---------|
 | SAST | CodeQL | Static code analysis |
 | Secrets | Gitleaks | Prevents credential leaks |
-| Dependencies | Trivy | Identifies vulnerable packages |
-| AI Review | Claude Code Action | AI-powered security review |
+| Dependencies | Trivy | Vulnerability scanning |
+| SBOM | Trivy | CycloneDX software bill of materials |
 | Runtime | Harden-Runner | Secures GitHub Actions runners |
+
+For a detailed analysis of security findings and the decision-making process behind what's addressed now versus later, see [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md).
 
 ### AI/LLM Security
 

@@ -5,9 +5,9 @@ name: CodeQL Analysis
 
 on:
   push:
-    branches: [main]
-    branches-ignore:
-      - 'dependabot/**'  # Dependabot pushes trigger pull_request instead
+    branches:
+      - main
+      - '!dependabot/**'
   pull_request:
     branches: [main]
   schedule:

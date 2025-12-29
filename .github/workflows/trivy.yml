@@ -32,7 +32,7 @@ jobs:
           egress-policy: audit
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Scan filesystem for vulnerabilities in dependencies
       - name: Trivy Vulnerability Scan (Filesystem)

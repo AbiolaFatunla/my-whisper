@@ -15,55 +15,75 @@ A personal voice dictation app with AI-powered transcription that learns from my
 
 I built this because I wanted a voice transcription tool that actually learns from my corrections. The idea is simple: when I fix a transcription error, the system remembers it. Make the same correction twice, and from the third time onwards it auto-applies. Over time, it becomes personalised to how I speak.
 
-The app uses OpenAI's Whisper API for transcription, Supabase for data persistence, and a straightforward vanilla JavaScript frontend with a glassmorphism design.
+The app uses OpenAI's Whisper API for transcription, Supabase for data persistence, and a vanilla JavaScript frontend with a glassmorphism design.
+
+## Architecture
+
+The app runs on a serverless architecture split across multiple platforms:
+
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| Frontend | Vercel | Static site hosting |
+| API | AWS Lambda + API Gateway | Serverless backend |
+| Database | Supabase (PostgreSQL) | Transcripts, corrections, auth |
+| Storage | AWS S3 | Audio file storage |
+| Transcription | OpenAI Whisper | Speech-to-text |
+| IaC | Terraform | AWS resource management |
+
+For the full technical breakdown, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Features
 
-- **Voice Recording** - Real-time waveform visualisation during recording
-- **AI Transcription** - Powered by OpenAI Whisper
-- **Personalisation** - Learns from corrections and applies them automatically
-- **History** - Browse and search past transcriptions
-- **Authentication** - Google OAuth via Supabase
+**Currently Working:**
+- Voice recording with real-time waveform visualisation
+- AI transcription via OpenAI Whisper
+- Transcripts saved to database
+- AI-generated titles for recordings
 
-## Tech Stack
+**In Development:**
+- History view (browse past recordings)
+- Editable transcripts
+- Personalisation (learn from corrections)
+- Google OAuth authentication
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | HTML, CSS, JavaScript (Vanilla) |
-| Backend | Node.js + Express |
-| Database | Supabase (PostgreSQL) |
-| Auth | Supabase Auth (Google OAuth) |
-| Storage | AWS S3 |
-| Transcription | OpenAI Whisper API |
+## Project Structure
 
-## Getting Started
+```
+my-whisper/
+├── app/                    # Local development (Express server)
+│   ├── public/            # Frontend assets (deployed to Vercel)
+│   ├── server.js          # Local dev server
+│   └── services/          # Backend services
+├── lambda/                 # Production API (AWS Lambda)
+│   └── index.js           # Native Lambda handler
+├── infrastructure/         # Terraform IaC
+│   └── *.tf               # AWS resource definitions
+└── .github/workflows/     # CI/CD pipelines
+```
 
-### Prerequisites
-
-- Node.js >= 18.0.0
-- OpenAI API key
-- Supabase project
-- AWS S3 bucket (optional, for audio storage)
-
-### Installation
+## Local Development
 
 ```bash
-git clone https://github.com/abiolafatunla/my-whisper.git
-cd my-whisper/app
+cd app
 npm install
-
-# Set up environment variables
 cp .env.example .env
-# Fill in your API keys in .env
-
+# Fill in your API keys
 npm start
 ```
 
-The app runs at `http://localhost:3001`
+The local server runs at `http://localhost:3001` and serves both the frontend and API.
+
+## Deployment
+
+**Frontend:** Vercel (auto-deploys from `app/public/`)
+
+**API:** AWS Lambda via GitHub Actions (triggers on changes to `lambda/`)
+
+**Infrastructure:** Terraform (manual apply from `infrastructure/`)
 
 ## Security
 
-I've set up a proper CI/CD pipeline with multiple layers of security scanning. The thing is, if you're building anything that handles user data and API keys, you need to be thorough about this.
+I've set up a proper CI/CD pipeline with multiple layers of security scanning. If you're building anything that handles user data and API keys, you need to be thorough about this.
 
 | Layer | Tool | Purpose |
 |-------|------|---------|
@@ -71,9 +91,8 @@ I've set up a proper CI/CD pipeline with multiple layers of security scanning. T
 | Secrets | Gitleaks | Prevents credential leaks |
 | Dependencies | Trivy | Vulnerability scanning |
 | SBOM | Trivy | CycloneDX software bill of materials |
-| Runtime | Harden-Runner | Secures GitHub Actions runners |
 
-For a detailed analysis of security findings and the decision-making process behind what's addressed now versus later, see [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md).
+For a detailed analysis of security findings, see [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md).
 
 ### AI/LLM Security
 
@@ -84,56 +103,23 @@ Since this is an AI-powered app, I follow the [OWASP LLM Top 10](https://genai.o
 - Rate limiting is in place to prevent abuse
 - Transcriptions are protected with Row Level Security
 
-### Reporting Security Issues
+## Environment Variables
 
-If you find a security vulnerability, please email me directly rather than opening a public issue. I'll respond within 48 hours.
+**Local Development (app/.env):**
 
-## Project Structure
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key for Whisper |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `AWS_ACCESS_KEY_ID` | AWS credentials for S3 |
+| `AWS_SECRET_ACCESS_KEY` | AWS credentials for S3 |
 
-```
-my-whisper/
-├── app/                    # Main application
-│   ├── public/            # Frontend assets
-│   ├── server.js          # Express server
-│   └── services/          # Backend services
-├── planning/              # Project documentation
-└── .github/
-    ├── workflows/         # CI/CD pipelines
-    ├── dependabot.yml     # Auto dependency updates
-    └── CODEOWNERS         # Review requirements
-```
-
-## Development
-
-```bash
-cd app
-npm run dev  # Uses nodemon for auto-reload
-```
-
-### Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `OPENAI_API_KEY` | OpenAI API key for Whisper | Yes |
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
-| `AWS_ACCESS_KEY_ID` | AWS credentials for S3 | Optional |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials for S3 | Optional |
-
-## Contributing
-
-If you want to contribute:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Open a Pull Request
-
-All PRs go through automated security scanning (CodeQL, Trivy, Gitleaks) and AI-powered code review before merge.
+**Production:** Environment variables are set via Terraform (Lambda) and Vercel dashboard.
 
 ## Licence
 
-© 2025 Abiola Fatunla. All rights reserved.
+(C) 2025 Abiola Fatunla. All rights reserved.
 
 This repository is shared for evaluation purposes only. Copying, modification, distribution, or use of this code is not permitted without explicit written permission. See [LICENSE](LICENSE) for full terms.
 

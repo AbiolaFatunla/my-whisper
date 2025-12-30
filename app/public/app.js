@@ -242,6 +242,7 @@ function hideUploadProgress() {
  */
 function showTranscriptionLoading() {
   transcriptionSection.style.display = 'block';
+  transcriptionSection.classList.add('show');
   transcriptionLoading.style.display = 'flex';
   transcriptionText.style.display = 'none';
   transcriptionActions.style.display = 'none';
@@ -281,6 +282,7 @@ function showTranscription(text, title, transcriptId) {
  */
 function hideTranscription() {
   transcriptionSection.style.display = 'none';
+  transcriptionSection.classList.remove('show');
   if (transcriptionTitle) transcriptionTitle.style.display = 'none';
   if (transcriptionNote) transcriptionNote.style.display = 'none';
 }

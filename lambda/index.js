@@ -142,7 +142,8 @@ async function downloadFromS3(fileUrl) {
 }
 
 // Temporary user ID for development (replaced with auth in Phase 5)
-const TEMP_USER_ID = '00000000-0000-0000-0000-000000000000';
+// Must match the RLS bypass policy in Supabase
+const TEMP_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 // Route handlers
 async function handleHealth() {

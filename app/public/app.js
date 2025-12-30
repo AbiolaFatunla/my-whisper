@@ -444,9 +444,34 @@ async function loadHistory() {
     } else {
       renderHistory();
     }
+
+    // Check for shared recording in URL after loading
+    checkSharedRecordingUrl();
   } catch (error) {
     console.error('Error loading history:', error);
     showHistoryEmpty();
+  }
+}
+
+/**
+ * Check URL for shared recording parameter and auto-open
+ */
+function checkSharedRecordingUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const recordingId = urlParams.get('recording');
+
+  if (recordingId) {
+    // Find the transcript
+    const transcript = transcripts.find(t => t.id === recordingId);
+
+    if (transcript) {
+      // Open the player modal for this recording
+      openPlayerModal(recordingId);
+
+      // Clean the URL without triggering a page reload
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
   }
 }
 
@@ -481,6 +506,15 @@ function renderHistory() {
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
         </button>
+        <button class="icon-button share-btn" data-id="${transcript.id}" aria-label="Share recording">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
         <button class="icon-button delete-btn" data-id="${transcript.id}" aria-label="Delete recording">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="3 6 5 6 21 6"></polyline>
@@ -498,6 +532,10 @@ function renderHistory() {
 
   recordingsList.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', () => copyHistoryTranscript(btn.dataset.id));
+  });
+
+  recordingsList.querySelectorAll('.share-btn').forEach(btn => {
+    btn.addEventListener('click', () => shareRecording(btn.dataset.id));
   });
 
   recordingsList.querySelectorAll('.delete-btn').forEach(btn => {
@@ -571,6 +609,52 @@ async function copyHistoryTranscript(id) {
     showToast('Copied to clipboard');
   } catch (error) {
     showToast('Failed to copy');
+  }
+}
+
+/**
+ * Share recording - copy shareable link to clipboard
+ * Creates a stateless share link with all data encoded in the URL
+ */
+async function shareRecording(id) {
+  const transcript = transcripts.find(t => t.id === id);
+  if (!transcript) {
+    showToast('Recording not found');
+    return;
+  }
+
+  // Build shareable URL with all data encoded (stateless - no database lookup needed)
+  const shareUrl = new URL(window.location.origin + '/share.html');
+  shareUrl.searchParams.set('audio', transcript.audio_url || '');
+  shareUrl.searchParams.set('title', transcript.title || 'Voice Recording');
+  if (transcript.raw_text) {
+    shareUrl.searchParams.set('text', transcript.raw_text);
+  }
+
+  try {
+    // Try Web Share API first (mobile-friendly)
+    if (navigator.share) {
+      await navigator.share({
+        title: transcript.title || 'Voice Recording',
+        text: transcript.raw_text ? transcript.raw_text.substring(0, 100) + '...' : 'Listen to this recording',
+        url: shareUrl.toString()
+      });
+      showToast('Shared');
+    } else {
+      // Fall back to clipboard copy
+      await navigator.clipboard.writeText(shareUrl.toString());
+      showToast('Link copied');
+    }
+  } catch (error) {
+    // User cancelled share or clipboard failed - try clipboard as fallback
+    if (error.name !== 'AbortError') {
+      try {
+        await navigator.clipboard.writeText(shareUrl.toString());
+        showToast('Link copied');
+      } catch (clipboardError) {
+        showToast('Failed to share');
+      }
+    }
   }
 }
 

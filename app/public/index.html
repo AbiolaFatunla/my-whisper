@@ -214,7 +214,7 @@
         </main>
     </div>
 
-    <!-- Audio Player Modal -->
+    <!-- Audio Player Modal (SYNC: keep in sync with history.html) -->
     <div class="modal" id="playerModal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
@@ -229,10 +229,14 @@
             <div class="player-container">
                 <audio id="audioPlayer" preload="metadata" controls style="width: 100%;"></audio>
             </div>
+            <div class="modal-transcript" id="modalTranscript">
+                <h4>Transcription</h4>
+                <p id="modalTranscriptText"></p>
+            </div>
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- Delete Confirmation Modal (SYNC: keep in sync with history.html) -->
     <div class="modal" id="deleteModal" style="display: none;">
         <div class="modal-content modal-small">
             <div class="modal-header">

@@ -409,6 +409,7 @@ const playerModal = document.getElementById('playerModal');
 const playerTitle = document.getElementById('playerTitle');
 const audioPlayer = document.getElementById('audioPlayer');
 const closePlayer = document.getElementById('closePlayer');
+const modalTranscriptText = document.getElementById('modalTranscriptText');
 
 // Delete Modal Elements
 const deleteModal = document.getElementById('deleteModal');
@@ -535,6 +536,11 @@ function openPlayerModal(id) {
   if (transcript.audio_url) {
     const audioUrl = `${config.apiUrl}/audio-proxy?url=${encodeURIComponent(transcript.audio_url)}`;
     audioPlayer.src = audioUrl;
+  }
+
+  // Set transcript text
+  if (modalTranscriptText) {
+    modalTranscriptText.textContent = transcript.raw_text || 'No transcription available';
   }
 
   playerModal.style.display = 'flex';

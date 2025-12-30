@@ -47,8 +47,8 @@
             </div>
         </header>
 
-        <!-- Navigation -->
-        <nav class="page-nav">
+        <!-- Navigation (mobile only - desktop shows side-by-side) -->
+        <nav class="page-nav mobile-only">
             <a href="index.html" class="nav-link active">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
@@ -175,6 +175,42 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Recordings List -->
+            <section class="recordings-section">
+                <div class="recordings-card">
+                    <div class="section-header">
+                        <h2>Your Recordings</h2>
+                        <button class="refresh-button" id="refreshBtn" aria-label="Refresh recordings">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6"></path>
+                                <path d="M1 20v-6h6"></path>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div class="loading-spinner" id="historyLoading">
+                        <div class="spinner"></div>
+                        <p>Loading recordings...</p>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div class="empty-state" id="historyEmpty" style="display: none;">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" y1="19" x2="12" y2="22"></line>
+                        </svg>
+                        <p>No recordings yet</p>
+                        <p class="empty-state-subtitle">Start by making your first recording</p>
+                    </div>
+
+                    <!-- Recordings List -->
+                    <div class="recordings-list" id="recordingsList" style="display: none;"></div>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -192,6 +228,26 @@
             </div>
             <div class="player-container">
                 <audio id="audioPlayer" preload="metadata" controls style="width: 100%;"></audio>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Delete Recording?</h3>
+                <button class="close-button" id="closeDelete" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <p style="margin-bottom: 24px; color: var(--text-secondary);">This action cannot be undone. The recording and transcription will be permanently deleted.</p>
+            <div class="modal-actions">
+                <button class="button button-secondary" id="cancelDelete">Cancel</button>
+                <button class="button button-danger" id="confirmDelete">Delete</button>
             </div>
         </div>
     </div>

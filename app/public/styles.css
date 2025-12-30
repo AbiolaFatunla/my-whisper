@@ -383,6 +383,11 @@ body::before {
   background: rgba(41, 37, 36, 0.5);
 }
 
+/* Hide nav on desktop when side-by-side layout is active */
+.page-nav.mobile-only {
+  display: none;
+}
+
 .nav-link {
   display: flex;
   align-items: center;
@@ -1346,6 +1351,15 @@ body::before {
     grid-template-columns: 1fr;
     gap: 24px;
     width: 100%;
+  }
+
+  /* Show nav on mobile, hide recordings section (use history.html instead) */
+  .page-nav.mobile-only {
+    display: flex;
+  }
+
+  .recordings-section {
+    display: none;
   }
 
   .header {

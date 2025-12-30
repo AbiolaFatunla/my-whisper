@@ -265,38 +265,50 @@
             document.body.setAttribute('data-theme', 'dark');
         }
 
-        // Parse URL parameters
-        const params = new URLSearchParams(window.location.search);
-        const audioUrl = params.get('audio');
-        const title = params.get('title');
-        const transcript = params.get('text');
-
         const content = document.getElementById('content');
 
-        if (!audioUrl) {
-            content.innerHTML = `
-                <div class="error">
-                    <h2>Invalid Link</h2>
-                    <p>This share link is missing audio data.</p>
-                    <a href="/" class="brand-link" style="margin-top: 24px;">
-                        <svg class="brand-logo" viewBox="0 0 1140 1084" xmlns="http://www.w3.org/2000/svg">
-                            <path class="logo-arc" d="M778.209,800.636c-51.535,59.252 -127.466,96.733 -212.082,96.733c-82.396,0 -156.556,-35.54 -207.975,-92.114l32.115,-55.625c40.315,53.099 104.111,87.414 175.859,87.414c74.045,0 139.62,-36.547 179.658,-92.57l32.424,56.161Z"/>
-                            <path class="logo-a-shape" d="M569.517,439.166l-311.837,540.11l-152.994,-88.332l448.51,-776.833l16.324,-9.425l16.337,9.432l448.494,776.825l-153.004,88.336l-311.83,-540.113Z"/>
-                        </svg>
-                        Go to My Whisper
-                    </a>
-                </div>
-            `;
-        } else {
-            // Build the proxied audio URL
-            const proxiedAudioUrl = `${config.apiUrl}/audio-proxy?url=${encodeURIComponent(audioUrl)}`;
+        // Get transcript ID from URL
+        const params = new URLSearchParams(window.location.search);
+        const transcriptId = params.get('id');
 
-            // Update page title
-            document.title = (title || 'Shared Recording') + ' - My Whisper';
+        // Store transcript text for copy button
+        let transcriptText = '';
+
+        async function loadSharedRecording() {
+            if (!transcriptId) {
+                showError('Invalid Link', 'This share link is missing the recording ID.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${config.apiUrl}/share/${transcriptId}`);
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        showError('Not Found', 'This recording no longer exists or the link is invalid.');
+                    } else {
+                        showError('Error', 'Failed to load the recording. Please try again.');
+                    }
+                    return;
+                }
+
+                const data = await response.json();
+                transcriptText = data.text || '';
+                renderRecording(data);
+
+            } catch (error) {
+                console.error('Failed to load shared recording:', error);
+                showError('Error', 'Failed to load the recording. Please check your connection.');
+            }
+        }
+
+        function renderRecording(data) {
+            const proxiedAudioUrl = `${config.apiUrl}/audio-proxy?url=${encodeURIComponent(data.audioUrl)}`;
+            document.title = (data.title || 'Shared Recording') + ' - My Whisper';
 
             content.innerHTML = `
                 <div class="share-header">
-                    <h1>${escapeHtml(title || 'Voice Recording')}</h1>
+                    <h1>${escapeHtml(data.title || 'Voice Recording')}</h1>
                     <p>Shared via My Whisper</p>
                 </div>
 
@@ -308,17 +320,17 @@
                     </audio>
                 </div>
 
-                ${transcript ? `
+                ${data.text ? `
                 <div class="transcript-section">
                     <div class="transcript-header">
                         <h3>Transcription</h3>
                     </div>
-                    <div class="transcript-text" id="transcriptText">${escapeHtml(transcript)}</div>
+                    <div class="transcript-text">${escapeHtml(data.text)}</div>
                 </div>
                 ` : ''}
 
                 <div class="action-buttons">
-                    ${transcript ? `
+                    ${data.text ? `
                     <button class="action-btn copy-btn" id="copyBtn">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -351,13 +363,29 @@
             if (copyBtn) {
                 copyBtn.addEventListener('click', async () => {
                     try {
-                        await navigator.clipboard.writeText(transcript);
+                        await navigator.clipboard.writeText(transcriptText);
                         showToast('Copied to clipboard');
                     } catch (e) {
                         showToast('Failed to copy');
                     }
                 });
             }
+        }
+
+        function showError(title, message) {
+            content.innerHTML = `
+                <div class="error">
+                    <h2>${escapeHtml(title)}</h2>
+                    <p>${escapeHtml(message)}</p>
+                    <a href="/" class="brand-link" style="margin-top: 24px;">
+                        <svg class="brand-logo" viewBox="0 0 1140 1084" xmlns="http://www.w3.org/2000/svg">
+                            <path class="logo-arc" d="M778.209,800.636c-51.535,59.252 -127.466,96.733 -212.082,96.733c-82.396,0 -156.556,-35.54 -207.975,-92.114l32.115,-55.625c40.315,53.099 104.111,87.414 175.859,87.414c74.045,0 139.62,-36.547 179.658,-92.57l32.424,56.161Z"/>
+                            <path class="logo-a-shape" d="M569.517,439.166l-311.837,540.11l-152.994,-88.332l448.51,-776.833l16.324,-9.425l16.337,9.432l448.494,776.825l-153.004,88.336l-311.83,-540.113Z"/>
+                        </svg>
+                        Go to My Whisper
+                    </a>
+                </div>
+            `;
         }
 
         function escapeHtml(text) {
@@ -375,6 +403,9 @@
                 toast.style.display = 'none';
             }, 2000);
         }
+
+        // Load the recording
+        loadSharedRecording();
     </script>
 </body>
 </html>

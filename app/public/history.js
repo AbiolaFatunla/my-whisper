@@ -242,7 +242,7 @@ async function copyTranscript(id) {
 
 /**
  * Share recording - copy shareable link to clipboard
- * Creates a stateless share link with all data encoded in the URL
+ * Uses transcript ID for clean URLs - share page fetches data from API
  */
 async function shareRecording(id) {
   const transcript = transcripts.find(t => t.id === id);
@@ -251,13 +251,9 @@ async function shareRecording(id) {
     return;
   }
 
-  // Build shareable URL with all data encoded (stateless - no database lookup needed)
+  // Build clean shareable URL with just the transcript ID
   const shareUrl = new URL(window.location.origin + '/share.html');
-  shareUrl.searchParams.set('audio', transcript.audio_url || '');
-  shareUrl.searchParams.set('title', transcript.title || 'Voice Recording');
-  if (transcript.raw_text) {
-    shareUrl.searchParams.set('text', transcript.raw_text);
-  }
+  shareUrl.searchParams.set('id', id);
 
   try {
     // Try Web Share API first (mobile-friendly)

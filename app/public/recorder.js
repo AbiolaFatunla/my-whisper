@@ -3,6 +3,9 @@
  * Handles MediaRecorder API for recording audio with visualization
  */
 
+// Maximum recording duration: 15 minutes
+const MAX_RECORDING_DURATION_MS = 15 * 60 * 1000;
+
 class AudioRecorder {
   constructor() {
     this.mediaRecorder = null;
@@ -14,6 +17,8 @@ class AudioRecorder {
     this.animationId = null;
     this.startTime = null;
     this.timerInterval = null;
+    this.maxDurationTimeout = null;
+    this.onMaxDurationReached = null; // Callback when max duration hit
   }
 
   /**
@@ -59,6 +64,13 @@ class AudioRecorder {
       // Start recording
       this.mediaRecorder.start(1000); // Collect data every second
       this.startTime = Date.now();
+
+      // Set up max duration timeout (15 minutes)
+      this.maxDurationTimeout = setTimeout(() => {
+        if (this.isRecording() && this.onMaxDurationReached) {
+          this.onMaxDurationReached();
+        }
+      }, MAX_RECORDING_DURATION_MS);
 
       return true;
     } catch (error) {
@@ -204,6 +216,12 @@ class AudioRecorder {
   cleanup() {
     this.stopVisualization();
 
+    // Clear max duration timeout
+    if (this.maxDurationTimeout) {
+      clearTimeout(this.maxDurationTimeout);
+      this.maxDurationTimeout = null;
+    }
+
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
@@ -266,6 +284,20 @@ class AudioRecorder {
     return !!(navigator.mediaDevices &&
               navigator.mediaDevices.getUserMedia &&
               window.MediaRecorder);
+  }
+
+  /**
+   * Get maximum recording duration in milliseconds
+   */
+  static getMaxDuration() {
+    return MAX_RECORDING_DURATION_MS;
+  }
+
+  /**
+   * Get maximum recording duration formatted as MM:SS
+   */
+  static getMaxDurationFormatted() {
+    return AudioRecorder.formatTime(MAX_RECORDING_DURATION_MS);
   }
 }
 

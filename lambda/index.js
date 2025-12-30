@@ -398,6 +398,40 @@ async function handleDeleteTranscript(id) {
   return jsonResponse(200, { success: true });
 }
 
+/**
+ * Public share endpoint - returns transcript data for shared links
+ * No auth required, read-only access to specific fields only
+ */
+async function handlePublicShare(id) {
+  if (!supabase) {
+    return errorResponse(500, 'Database not configured');
+  }
+
+  if (!id) {
+    return errorResponse(400, 'Transcript ID is required');
+  }
+
+  // Fetch transcript without user_id check (public read-only access)
+  // Only return fields needed for display, not the full record
+  const { data, error } = await supabase
+    .from('transcripts')
+    .select('id, title, raw_text, audio_url, created_at')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) {
+    return errorResponse(404, 'Recording not found');
+  }
+
+  return jsonResponse(200, {
+    id: data.id,
+    title: data.title,
+    text: data.raw_text,
+    audioUrl: data.audio_url,
+    createdAt: data.created_at
+  });
+}
+
 async function handleAudioProxy(queryParams) {
   const url = queryParams?.url;
 
@@ -492,6 +526,12 @@ exports.handler = async (event) => {
 
     if (path === '/audio-proxy' && method === 'GET') {
       return await handleAudioProxy(queryParams);
+    }
+
+    // Match /share/:id (public endpoint for shared links)
+    const shareMatch = path.match(/^\/share\/([^\/]+)$/);
+    if (shareMatch && method === 'GET') {
+      return await handlePublicShare(shareMatch[1]);
     }
 
     // Match /transcripts/:id

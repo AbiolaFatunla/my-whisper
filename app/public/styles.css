@@ -365,6 +365,61 @@ body::before {
   display: none;
 }
 
+/* Page Navigation */
+.page-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-full);
+  width: fit-content;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .page-nav {
+  background: rgba(41, 37, 36, 0.5);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius-full);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-link.active {
+  background: var(--bg-gradient);
+  color: white;
+  box-shadow: var(--shadow-md);
+}
+
+.nav-link.active:hover {
+  background: var(--bg-gradient);
+  color: white;
+}
+
+.nav-link svg {
+  flex-shrink: 0;
+}
+
 /* Recording Section - Premium Card Design */
 .recording-section {
   margin: 0;
@@ -1602,6 +1657,76 @@ body::before {
   display: flex;
   gap: 12px;
   justify-content: center;
+}
+
+/* History Page Styles */
+.history-main {
+  width: 100%;
+}
+
+.history-section {
+  width: 100%;
+  max-width: 800px;
+}
+
+.history-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.history-card .section-header {
+  margin-bottom: 24px;
+}
+
+/* Modal Transcript Section */
+.modal-transcript {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.modal-transcript h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.modal-transcript p {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Button Primary Style */
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-gradient);
+  color: white;
+  text-decoration: none;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: var(--transition);
+  box-shadow: var(--shadow-md);
+}
+
+.button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Accessibility */

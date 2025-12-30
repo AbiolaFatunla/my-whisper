@@ -406,18 +406,26 @@ async function handleAudioProxy(queryParams) {
   }
 
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      return errorResponse(response.status, 'Failed to fetch audio');
-    }
+    // Use S3 SDK for private bucket access (same as transcribe)
+    const audioBuffer = await downloadFromS3(url);
 
-    const buffer = await response.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
+    // Determine content type from file extension
+    const ext = path.extname(url).toLowerCase();
+    const contentTypes = {
+      '.webm': 'audio/webm',
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+      '.m4a': 'audio/mp4'
+    };
+    const contentType = contentTypes[ext] || 'audio/webm';
+
+    const base64 = audioBuffer.toString('base64');
 
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': response.headers.get('content-type') || 'audio/webm',
+        'Content-Type': contentType,
         'Access-Control-Allow-Origin': '*'
       },
       body: base64,

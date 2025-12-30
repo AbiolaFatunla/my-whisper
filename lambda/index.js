@@ -3,7 +3,7 @@
  * Native Lambda implementation for API Gateway HTTP API
  */
 
-const { S3Client, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { createClient } = require('@supabase/supabase-js');
 const OpenAI = require('openai');
@@ -74,6 +74,71 @@ function cleanGeneratedTitle(title) {
     .split(' ')
     .slice(0, 4)
     .join(' ');
+}
+
+/**
+ * Parse S3 URL and extract bucket and key
+ * Supports formats:
+ * - https://bucket.s3.region.amazonaws.com/key
+ * - https://bucket.s3.amazonaws.com/key
+ * - s3://bucket/key
+ */
+function parseS3Url(url) {
+  try {
+    // Handle s3:// protocol
+    if (url.startsWith('s3://')) {
+      const parts = url.replace('s3://', '').split('/');
+      const bucket = parts.shift();
+      const key = parts.join('/');
+      return { bucket, key };
+    }
+
+    // Handle https:// S3 URLs
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+
+    // Format: bucket.s3.region.amazonaws.com or bucket.s3.amazonaws.com
+    if (hostname.includes('.s3.') && hostname.endsWith('.amazonaws.com')) {
+      const bucket = hostname.split('.s3.')[0];
+      const key = urlObj.pathname.substring(1); // Remove leading /
+      return { bucket, key };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error parsing S3 URL:', error);
+    return null;
+  }
+}
+
+/**
+ * Download file from S3 using SDK (works with private buckets)
+ */
+async function downloadFromS3(fileUrl) {
+  const s3Info = parseS3Url(fileUrl);
+
+  if (s3Info) {
+    // Use S3 SDK for S3 URLs (required for private buckets)
+    const command = new GetObjectCommand({
+      Bucket: s3Info.bucket,
+      Key: s3Info.key
+    });
+
+    const response = await s3Client.send(command);
+    const chunks = [];
+    for await (const chunk of response.Body) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  }
+
+  // Fallback to fetch for non-S3 URLs
+  const response = await fetch(fileUrl);
+  if (!response.ok) {
+    throw new Error('Failed to download audio file');
+  }
+  const buffer = await response.arrayBuffer();
+  return Buffer.from(buffer);
 }
 
 // Temporary user ID for development (replaced with auth in Phase 5)
@@ -163,14 +228,14 @@ async function handleTranscribe(body) {
     return errorResponse(500, 'OpenAI API key not configured');
   }
 
-  // Download audio file
-  const response = await fetch(fileUrl);
-  if (!response.ok) {
+  // Download audio file using S3 SDK (required for private buckets)
+  let audioFile;
+  try {
+    audioFile = await downloadFromS3(fileUrl);
+  } catch (downloadError) {
+    console.error('Failed to download audio:', downloadError);
     return errorResponse(500, 'Failed to download audio file');
   }
-
-  const buffer = await response.arrayBuffer();
-  const audioFile = Buffer.from(buffer);
 
   // Create temp file for Whisper
   const urlObject = new URL(fileUrl);

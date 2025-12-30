@@ -47,7 +47,7 @@ variable "lambda_memory" {
 variable "lambda_timeout" {
   description = "Lambda timeout in seconds"
   type        = number
-  default     = 30
+  default     = 90
 }
 
 # Application secrets (passed as Lambda env vars)

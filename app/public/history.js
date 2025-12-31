@@ -15,8 +15,10 @@ const toast = document.getElementById('toast');
 const signInBtn = document.getElementById('signInBtn');
 const signOutBtn = document.getElementById('signOutBtn');
 const userMenu = document.getElementById('userMenu');
+const userInfo = document.getElementById('userInfo');
 const userAvatar = document.getElementById('userAvatar');
 const userName = document.getElementById('userName');
+const userEmail = document.getElementById('userEmail');
 
 // Player Modal Elements
 const playerModal = document.getElementById('playerModal');
@@ -89,6 +91,13 @@ function updateAuthUI() {
     if (userName) {
       userName.textContent = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
     }
+    if (userEmail) {
+      userEmail.textContent = user.email || '';
+    }
+    // Reset email display state
+    if (userInfo) {
+      userInfo.classList.remove('show-email');
+    }
   } else {
     if (signInBtn) signInBtn.style.display = 'flex';
     if (userMenu) userMenu.style.display = 'none';
@@ -119,6 +128,13 @@ function setupAuthEventListeners() {
         console.error('Sign out failed:', error);
         showToast('Sign out failed', 'error');
       }
+    });
+  }
+
+  // Toggle email display on user info click
+  if (userInfo) {
+    userInfo.addEventListener('click', () => {
+      userInfo.classList.toggle('show-email');
     });
   }
 }

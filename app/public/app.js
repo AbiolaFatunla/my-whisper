@@ -13,8 +13,10 @@ console.log('My Whisper loaded');
 const signInBtn = document.getElementById('signInBtn');
 const signOutBtn = document.getElementById('signOutBtn');
 const userMenu = document.getElementById('userMenu');
+const userInfo = document.getElementById('userInfo');
 const userAvatar = document.getElementById('userAvatar');
 const userName = document.getElementById('userName');
+const userEmail = document.getElementById('userEmail');
 
 // DOM Elements
 const recordButton = document.getElementById('recordButton');
@@ -115,6 +117,13 @@ function updateAuthUI() {
     if (userName) {
       userName.textContent = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
     }
+    if (userEmail) {
+      userEmail.textContent = user.email || '';
+    }
+    // Reset email display state
+    if (userInfo) {
+      userInfo.classList.remove('show-email');
+    }
   } else {
     // User is not signed in (anonymous mode)
     if (signInBtn) signInBtn.style.display = 'flex';
@@ -132,6 +141,13 @@ function setupAuthEventListeners() {
 
   if (signOutBtn) {
     signOutBtn.addEventListener('click', handleSignOut);
+  }
+
+  // Toggle email display on user info click
+  if (userInfo) {
+    userInfo.addEventListener('click', () => {
+      userInfo.classList.toggle('show-email');
+    });
   }
 }
 
@@ -199,6 +215,62 @@ async function toggleRecording() {
   }
 }
 
+// Anonymous user trial limit
+const ANONYMOUS_RECORDING_LIMIT = 2;
+
+/**
+ * Check if anonymous user has reached recording limit
+ * Returns true if they can record, false if limit reached
+ */
+async function checkAnonymousLimit() {
+  // Authenticated users have no limit
+  if (auth.isAuthenticated()) {
+    return true;
+  }
+
+  try {
+    const response = await authFetch(`${config.apiUrl}/transcripts`);
+    if (!response.ok) {
+      // If we can't check, allow recording (fail open)
+      return true;
+    }
+
+    const data = await response.json();
+    const count = (data.transcripts || []).length;
+
+    if (count >= ANONYMOUS_RECORDING_LIMIT) {
+      showTrialLimitModal();
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error checking limit:', error);
+    // Fail open - allow recording if check fails
+    return true;
+  }
+}
+
+/**
+ * Show trial limit modal
+ */
+function showTrialLimitModal() {
+  const modal = document.getElementById('trialLimitModal');
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+}
+
+/**
+ * Close trial limit modal
+ */
+function closeTrialLimitModal() {
+  const modal = document.getElementById('trialLimitModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
 /**
  * Start recording
  */
@@ -206,6 +278,12 @@ async function startRecording() {
   try {
     hideError();
     hideTranscription();
+
+    // Check anonymous user limit
+    const canRecord = await checkAnonymousLimit();
+    if (!canRecord) {
+      return;
+    }
 
     // Set up max duration callback (15 minutes)
     recorder.onMaxDurationReached = () => {
@@ -937,8 +1015,33 @@ function setupHistoryEventListeners() {
     if (e.key === 'Escape') {
       closePlayerModal();
       closeDeleteModal();
+      closeTrialLimitModal();
     }
   });
+
+  // Trial limit modal
+  const trialLimitModal = document.getElementById('trialLimitModal');
+  const closeTrialLimit = document.getElementById('closeTrialLimit');
+  const trialSignInBtn = document.getElementById('trialSignInBtn');
+  const trialDismissBtn = document.getElementById('trialDismissBtn');
+
+  if (closeTrialLimit) {
+    closeTrialLimit.addEventListener('click', closeTrialLimitModal);
+  }
+  if (trialDismissBtn) {
+    trialDismissBtn.addEventListener('click', closeTrialLimitModal);
+  }
+  if (trialSignInBtn) {
+    trialSignInBtn.addEventListener('click', async () => {
+      closeTrialLimitModal();
+      await handleSignIn();
+    });
+  }
+  if (trialLimitModal) {
+    trialLimitModal.addEventListener('click', (e) => {
+      if (e.target === trialLimitModal) closeTrialLimitModal();
+    });
+  }
 }
 
 /**

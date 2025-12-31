@@ -190,6 +190,32 @@ async function downloadFromS3(fileUrl) {
 // Will be removed once all users have anonymous IDs
 const TEMP_USER_ID = '00000000-0000-0000-0000-000000000001';
 
+// Anonymous user recording limit
+const ANONYMOUS_RECORDING_LIMIT = 2;
+
+/**
+ * Check if request has a valid JWT (authenticated user)
+ */
+function isAuthenticatedUser(headers) {
+  const normalizedHeaders = {};
+  for (const [key, value] of Object.entries(headers || {})) {
+    normalizedHeaders[key.toLowerCase()] = value;
+  }
+
+  const authHeader = normalizedHeaders['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      const payloadBase64 = token.split('.')[1];
+      const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
+      return !!payload.sub;
+    } catch (e) {
+      return false;
+    }
+  }
+  return false;
+}
+
 // ================================
 // PERSONALIZATION FUNCTIONS
 // ================================
@@ -455,11 +481,28 @@ async function handleMoveToShared(body) {
   });
 }
 
-async function handleTranscribe(body, userId) {
+async function handleTranscribe(body, userId, headers) {
   const { fileUrl } = body;
 
   if (!fileUrl) {
     return errorResponse(400, 'File URL is required');
+  }
+
+  // Check anonymous user limit
+  if (!isAuthenticatedUser(headers)) {
+    try {
+      const { data: transcripts } = await supabase
+        .from('transcripts')
+        .select('id')
+        .eq('user_id', userId);
+
+      if (transcripts && transcripts.length >= ANONYMOUS_RECORDING_LIMIT) {
+        return errorResponse(403, 'Trial limit reached. Sign in for unlimited access.');
+      }
+    } catch (limitError) {
+      console.error('Error checking limit:', limitError);
+      // Continue if limit check fails (fail open)
+    }
   }
 
   if (!openaiClient) {
@@ -811,7 +854,7 @@ exports.handler = async (event) => {
     }
 
     if (path === '/transcribe' && method === 'POST') {
-      return await handleTranscribe(body, userId);
+      return await handleTranscribe(body, userId, headers);
     }
 
     if (path === '/transcripts' && method === 'GET') {

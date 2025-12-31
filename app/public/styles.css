@@ -361,12 +361,31 @@ body::before {
   gap: 10px;
 }
 
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  transition: background 0.2s ease;
+}
+
+.user-info:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .user-info:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .user-avatar {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-full);
   object-fit: cover;
   border: 2px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .user-name {
@@ -377,6 +396,24 @@ body::before {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-email {
+  display: none;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-info.show-email .user-name {
+  display: none;
+}
+
+.user-info.show-email .user-email {
+  display: block;
 }
 
 /* Hide user name on small screens */

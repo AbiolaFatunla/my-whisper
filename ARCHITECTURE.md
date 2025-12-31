@@ -66,7 +66,7 @@ This approach means the system genuinely improves for each user's specific vocab
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │  API Gateway (HTTP API)                                  │    │
-│  │  https://s0ejd5tdzg.execute-api.eu-west-2.amazonaws.com │    │
+│  │  https://{api-id}.execute-api.eu-west-2.amazonaws.com   │    │
 │  └────────────────────────┬────────────────────────────────┘    │
 │                           │                                      │
 │                           ▼                                      │

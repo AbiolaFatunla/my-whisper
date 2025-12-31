@@ -141,6 +141,27 @@ function cleanGeneratedTitle(title) {
 // Temporary user ID for backwards compatibility during auth transition
 const TEMP_USER_ID = '00000000-0000-0000-0000-000000000001';
 
+// Anonymous user recording limit
+const ANONYMOUS_RECORDING_LIMIT = 2;
+
+/**
+ * Check if request is from an authenticated user (has valid JWT)
+ */
+function isAuthenticatedUser(req) {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      const payloadBase64 = token.split('.')[1];
+      const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
+      return !!payload.sub;
+    } catch (e) {
+      return false;
+    }
+  }
+  return false;
+}
+
 /**
  * Extract user ID from request headers
  * Priority: 1. JWT token (authenticated user) 2. Anonymous ID header
@@ -284,6 +305,22 @@ app.post('/api/transcribe', async (req, res) => {
 
     if (!fileUrl) {
       return res.status(400).json({ error: 'File URL is required' });
+    }
+
+    // Check anonymous user limit
+    if (!isAuthenticatedUser(req)) {
+      try {
+        const transcripts = await database.getTranscripts(userId, 100, 0);
+        if (transcripts && transcripts.length >= ANONYMOUS_RECORDING_LIMIT) {
+          return res.status(403).json({
+            error: 'limit_reached',
+            message: 'Trial limit reached. Sign in for unlimited access.'
+          });
+        }
+      } catch (limitError) {
+        console.error('Error checking limit:', limitError);
+        // Continue if limit check fails (fail open)
+      }
     }
 
     if (!openaiClient) {

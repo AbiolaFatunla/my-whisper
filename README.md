@@ -1,6 +1,6 @@
 # My Whisper
 
-A personal voice dictation app with AI-powered transcription that learns from my corrections over time.
+A personal voice dictation app powered by multiple AI models, with a learning algorithm that adapts to how I speak.
 
 <!-- Security & CI Badges -->
 [![CI](https://github.com/abiolafatunla/my-whisper/actions/workflows/ci.yml/badge.svg)](https://github.com/abiolafatunla/my-whisper/actions/workflows/ci.yml)
@@ -15,7 +15,7 @@ A personal voice dictation app with AI-powered transcription that learns from my
 
 I built this because I wanted a voice transcription tool that actually learns from my corrections. The idea is simple: when I fix a transcription error, the system remembers it. Make the same correction twice, and from the third time onwards it auto-applies. Over time, it becomes personalised to how I speak.
 
-The app uses OpenAI's Whisper API for transcription, Supabase for data persistence, and a vanilla JavaScript frontend with a glassmorphism design.
+The app integrates two AI models - Whisper for transcription and GPT-4o-mini for title generation - alongside a phrase-matching algorithm that learns from your corrections. Built with Supabase for persistence and a vanilla JavaScript frontend with glassmorphism design.
 
 ## Architecture
 
@@ -28,23 +28,35 @@ The app runs on a serverless architecture split across multiple platforms:
 | Database | Supabase (PostgreSQL) | Transcripts, corrections, auth |
 | Storage | AWS S3 | Audio file storage |
 | Transcription | OpenAI Whisper | Speech-to-text |
+| Title Generation | OpenAI GPT-4o-mini | Auto-generate recording titles |
+| Personalisation | Phrase-matching algorithm | Learn from user corrections |
 | IaC | Terraform | AWS resource management |
 
 For the full technical breakdown, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Features
 
-**Currently Working:**
+**Recording & Transcription**
 - Voice recording with real-time waveform visualisation
 - AI transcription via OpenAI Whisper
-- Transcripts saved to database
-- AI-generated titles for recordings
+- AI-generated titles using GPT-4o-mini
+- 15-minute max recording limit
 
-**In Development:**
-- History view (browse past recordings)
-- Editable transcripts
-- Personalisation (learn from corrections)
+**History & Playback**
+- Browse past recordings with side-by-side layout
+- Audio playback with full transcript display
+- Share recordings via Web Share API or clipboard
+- Delete recordings with confirmation
+
+**Editing & Personalisation**
+- Edit transcripts directly in the app
+- The app learns from your corrections through a feedback loop
+- Make the same correction twice, and it auto-applies from then on
+- Builds a personal correction dictionary that anticipates your edits
+
+**Coming Soon**
 - Google OAuth authentication
+- Multi-user support with data isolation
 
 ## Project Structure
 

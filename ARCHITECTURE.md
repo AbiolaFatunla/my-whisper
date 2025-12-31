@@ -19,6 +19,31 @@ The app is split across multiple platforms, each handling what it does best:
 
 ---
 
+## AI & Intelligence
+
+The app uses a combination of AI services and algorithms:
+
+| Feature | Technology | How It Works |
+|---------|------------|--------------|
+| **Transcription** | OpenAI Whisper (whisper-1) | Converts audio to text with high accuracy |
+| **Title Generation** | OpenAI GPT-4o-mini | Summarises transcript into a 1-4 word title |
+| **Personalisation** | LCS diff algorithm | Learns from user corrections over time |
+
+### Learns From Your Edits
+
+The app learns from your corrections through a feedback loop. When you fix an error, the system remembers it. Make the same correction twice, and it auto-applies from then on. Over time, it builds a personal correction dictionary and anticipates the corrections you'd make.
+
+**How it works:**
+
+1. **Extraction**: When you save an edited transcript, the system computes a diff using the Longest Common Subsequence (LCS) algorithm to identify phrase-level changes
+2. **Storage**: Each correction is stored with a count that increments on repeat occurrences
+3. **Application**: Corrections with count >= 2 are automatically applied to future transcriptions
+4. **Confidence**: The count threshold prevents one-off typos from becoming permanent corrections
+
+This approach means the system genuinely improves for each user's specific vocabulary and speech patterns, without any cloud-based ML training.
+
+---
+
 ## System Diagram
 
 ```
@@ -168,7 +193,7 @@ The app is split across multiple platforms, each handling what it does best:
 3. Lambda computes diff between raw_text and finalText
    │
    ▼
-4. Lambda extracts word-level corrections
+4. Lambda extracts phrase-level corrections (LCS algorithm)
    │
    ▼
 5. Lambda upserts corrections to Supabase

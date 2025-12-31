@@ -550,7 +550,7 @@ function renderHistory() {
         <div class="recording-name">${escapeHtml(transcript.title || 'Untitled Recording')}</div>
         <div class="recording-meta">
           <span>${formatDate(transcript.created_at)}</span>
-          <span>${truncateText(transcript.raw_text, 50)}</span>
+          <span>${truncateText(transcript.final_text || transcript.personalized_text || transcript.raw_text, 50)}</span>
         </div>
       </div>
       <div class="recording-actions">
@@ -638,9 +638,9 @@ function openPlayerModal(id) {
     audioPlayer.src = audioUrl;
   }
 
-  // Set transcript text - use final_text if available, otherwise raw_text
+  // Set transcript text - use final_text if available, then personalized_text, then raw_text
   if (modalTranscriptText) {
-    modalTranscriptText.value = transcript.final_text || transcript.raw_text || '';
+    modalTranscriptText.value = transcript.final_text || transcript.personalized_text || transcript.raw_text || '';
   }
 
   playerModal.style.display = 'flex';
@@ -698,7 +698,7 @@ async function saveModalTranscript() {
  */
 async function copyHistoryTranscript(id) {
   const transcript = transcripts.find(t => t.id === id);
-  const textToCopy = transcript?.final_text || transcript?.raw_text;
+  const textToCopy = transcript?.final_text || transcript?.personalized_text || transcript?.raw_text;
 
   if (!textToCopy) {
     showToast('No text to copy');

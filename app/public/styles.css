@@ -284,8 +284,8 @@ body::before {
 
 .app-subtitle {
   position: relative;
-  display: inline-flex;
-  align-items: center;
+  display: inline-block;
+  width: fit-content;
   padding: 6px 18px;
   margin-left: 48px;
   font-size: 0.96rem;
@@ -1441,30 +1441,37 @@ body::before {
 
   .header {
     flex-direction: row;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 16px;
   }
 
   .brand-group {
-    gap: 4px;
-    flex: 1;
+    display: contents;
   }
 
   .app-title {
     font-size: 1.5rem;
+    order: 1;
   }
 
   .app-subtitle {
-    font-size: 0.85rem;
-    padding: 3px 12px;
+    font-size: 0.8rem;
+    padding: 6px 16px;
     margin-left: 0;
+    white-space: normal;
+    text-align: center;
+    border-radius: var(--radius-md);
+    width: 100%;
+    order: 3;
   }
 
   .header-controls {
     flex-shrink: 0;
-    margin-top: 4px;
+    gap: 8px;
+    order: 2;
   }
 
   .theme-toggle {
@@ -1547,6 +1554,20 @@ body::before {
 }
 
 @media (max-width: 480px) {
+  .app-title {
+    font-size: 1.25rem;
+  }
+
+  .app-subtitle {
+    font-size: 0.72rem;
+    padding: 5px 12px;
+  }
+
+  .theme-toggle {
+    width: 38px;
+    height: 38px;
+  }
+
   .section-header {
     flex-direction: column;
     align-items: flex-start;

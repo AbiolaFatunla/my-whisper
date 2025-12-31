@@ -1654,6 +1654,7 @@ body::before {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-start;
+  margin-bottom: 12px;
 }
 
 .transcription-btn {

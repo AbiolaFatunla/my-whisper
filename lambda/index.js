@@ -411,12 +411,13 @@ async function handlePublicShare(id) {
     return errorResponse(400, 'Transcript ID is required');
   }
 
-  // Fetch transcript without user_id check (public read-only access)
-  // Only return fields needed for display, not the full record
+  // Fetch transcript - must include user_id filter to satisfy RLS policy
+  // Currently all transcripts use TEMP_USER_ID, later this will need auth
   const { data, error } = await supabase
     .from('transcripts')
     .select('id, title, raw_text, audio_url, created_at')
     .eq('id', id)
+    .eq('user_id', TEMP_USER_ID)
     .single();
 
   if (error || !data) {

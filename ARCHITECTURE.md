@@ -209,6 +209,50 @@ This approach means the system genuinely improves for each user's specific vocab
 
 ---
 
+## Authentication
+
+The app supports both anonymous and authenticated users, with complete data isolation between them.
+
+### How It Works
+
+```
+Anonymous User:
+┌─────────────────────────────────────────────────────────────┐
+│  Browser generates UUID on first visit                       │
+│  └── Stored in localStorage                                  │
+│  └── Sent as X-Anonymous-ID header on every API call        │
+│  └── Backend filters all queries by this user_id            │
+└─────────────────────────────────────────────────────────────┘
+
+Authenticated User:
+┌─────────────────────────────────────────────────────────────┐
+│  User clicks "Sign in" → redirects to Google OAuth          │
+│  └── Supabase handles OAuth flow                             │
+│  └── Returns JWT with user's Supabase ID                     │
+│  └── Sent as Authorization: Bearer <token> header           │
+│  └── Backend extracts user_id from JWT payload              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Data Isolation
+
+All database queries filter by `user_id`:
+
+```javascript
+// Backend extracts user ID from headers
+const userId = getUserIdFromHeaders(headers);
+
+// All queries are scoped to this user
+await supabase.from('transcripts').select('*').eq('user_id', userId);
+```
+
+This means:
+- Different browsers see different recordings (even without sign-in)
+- Signing in ties recordings to your Google account
+- No way for users to access each other's data
+
+---
+
 ## Local Development
 
 For local development, `server.js` runs everything together:

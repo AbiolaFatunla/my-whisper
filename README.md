@@ -25,7 +25,8 @@ The app runs on a serverless architecture split across multiple platforms:
 |-------|------------|---------|
 | Frontend | Vercel | Static site hosting |
 | API | AWS Lambda + API Gateway | Serverless backend |
-| Database | Supabase (PostgreSQL) | Transcripts, corrections, auth |
+| Database | Supabase (PostgreSQL) | Transcripts, corrections |
+| Auth | Supabase Auth | Google OAuth + anonymous users |
 | Storage | AWS S3 | Audio file storage |
 | Transcription | OpenAI Whisper | Speech-to-text |
 | Title Generation | OpenAI GPT-4o-mini | Auto-generate recording titles |
@@ -54,9 +55,11 @@ For the full technical breakdown, see [ARCHITECTURE.md](ARCHITECTURE.md).
 - Make the same correction twice, and it auto-applies from then on
 - Builds a personal correction dictionary that anticipates your edits
 
-**Coming Soon**
-- Google OAuth authentication
-- Multi-user support with data isolation
+**Authentication & Data Isolation**
+- Google OAuth sign-in via Supabase Auth
+- Anonymous user support with browser-based UUID
+- Complete data isolation - each user only sees their own recordings
+- Seamless experience whether signed in or not
 
 ## Project Structure
 

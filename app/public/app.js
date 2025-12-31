@@ -635,10 +635,11 @@ async function shareRecording(id) {
 
   try {
     // Try Web Share API first (mobile-friendly)
+    // Note: Don't include 'text' - when users pick "Copy" from share menu,
+    // some browsers/OS concatenate text+url, breaking the link
     if (navigator.share) {
       await navigator.share({
         title: transcript.title || 'Voice Recording',
-        text: transcript.raw_text ? transcript.raw_text.substring(0, 100) + '...' : 'Listen to this recording',
         url: shareUrl.toString()
       });
       showToast('Shared');

@@ -385,6 +385,38 @@ app.delete('/api/transcripts/:id', async (req, res) => {
 });
 
 /**
+ * Public share endpoint - returns transcript data for shared links
+ * No auth required, read-only access to specific fields only
+ */
+app.get('/api/share/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: 'Transcript ID is required' });
+    }
+
+    const transcript = await database.getTranscript(id);
+
+    if (!transcript) {
+      return res.status(404).json({ error: 'Recording not found' });
+    }
+
+    // Return only public fields
+    res.json({
+      id: transcript.id,
+      title: transcript.title,
+      text: transcript.raw_text,
+      audioUrl: transcript.audio_url,
+      createdAt: transcript.created_at
+    });
+  } catch (error) {
+    console.error('Error fetching shared transcript:', error);
+    res.status(404).json({ error: 'Recording not found' });
+  }
+});
+
+/**
  * Audio proxy for CORS
  */
 app.get('/api/audio-proxy', async (req, res) => {

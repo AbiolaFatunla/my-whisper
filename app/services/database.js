@@ -5,6 +5,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { v4: uuidv4 } = require('uuid');
+const { extractCorrections, applyCorrections } = require('./personalization');
 
 let supabase = null;
 
@@ -127,6 +128,7 @@ async function getTranscripts(limit = 50, offset = 0) {
 
 /**
  * Update a transcript (for editing)
+ * Also extracts corrections by comparing raw_text with finalText
  */
 async function updateTranscript(id, { finalText }) {
   const client = initSupabase();
@@ -134,6 +136,42 @@ async function updateTranscript(id, { finalText }) {
     throw new Error('Database not initialized');
   }
 
+  // First, fetch the current transcript to get raw_text
+  const { data: existing, error: fetchError } = await client
+    .from('transcripts')
+    .select('raw_text')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching transcript for correction extraction:', fetchError);
+    throw fetchError;
+  }
+
+  // Extract corrections from the diff
+  if (existing?.raw_text && finalText) {
+    const corrections = extractCorrections(existing.raw_text, finalText);
+
+    // Save each correction
+    for (const correction of corrections) {
+      try {
+        await saveCorrection({
+          originalToken: correction.original,
+          correctedToken: correction.corrected
+        });
+        console.log('✓ Correction saved:', correction.original, '->', correction.corrected);
+      } catch (corrError) {
+        console.error('Error saving correction:', corrError);
+        // Continue saving other corrections even if one fails
+      }
+    }
+
+    if (corrections.length > 0) {
+      console.log(`✓ Extracted ${corrections.length} correction(s) from edit`);
+    }
+  }
+
+  // Update the transcript
   const { data, error } = await client
     .from('transcripts')
     .update({
@@ -258,6 +296,30 @@ async function saveCorrection({ originalToken, correctedToken }) {
   }
 }
 
+/**
+ * Apply personalization to text using learned corrections
+ * Fetches corrections from DB and applies those with count >= minCount
+ */
+async function personalizeText(text, minCount = 2) {
+  if (!text) return text;
+
+  try {
+    const corrections = await getCorrections(minCount);
+
+    if (corrections.length === 0) {
+      return text;
+    }
+
+    const personalized = applyCorrections(text, corrections, minCount);
+    console.log(`✓ Applied ${corrections.length} correction(s) to transcription`);
+    return personalized;
+  } catch (error) {
+    console.error('Error applying personalization:', error);
+    // Return original text if personalization fails
+    return text;
+  }
+}
+
 module.exports = {
   initSupabase,
   generateId,
@@ -267,5 +329,6 @@ module.exports = {
   updateTranscript,
   deleteTranscript,
   getCorrections,
-  saveCorrection
+  saveCorrection,
+  personalizeText
 };

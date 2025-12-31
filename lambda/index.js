@@ -145,6 +145,198 @@ async function downloadFromS3(fileUrl) {
 // Must match the RLS bypass policy in Supabase
 const TEMP_USER_ID = '00000000-0000-0000-0000-000000000001';
 
+// ================================
+// PERSONALIZATION FUNCTIONS
+// ================================
+
+/**
+ * Tokenize text into words
+ */
+function tokenize(text) {
+  if (!text) return [];
+  return text.trim().split(/\s+/).filter(w => w.length > 0);
+}
+
+/**
+ * Normalize text for comparison
+ */
+function normalize(word) {
+  return word.toLowerCase().replace(/[.,!?;:'"]/g, '');
+}
+
+/**
+ * Find longest common subsequence between two word arrays
+ */
+function findLCS(words1, words2) {
+  const m = words1.length;
+  const n = words2.length;
+
+  const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (normalize(words1[i - 1]) === normalize(words2[j - 1])) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  const matches = [];
+  let i = m, j = n;
+
+  while (i > 0 && j > 0) {
+    if (normalize(words1[i - 1]) === normalize(words2[j - 1])) {
+      matches.unshift({ i: i - 1, j: j - 1 });
+      i--;
+      j--;
+    } else if (dp[i - 1][j] > dp[i][j - 1]) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+
+  return matches;
+}
+
+/**
+ * Extract corrections by comparing raw text with edited text
+ */
+function extractCorrections(rawText, finalText) {
+  if (!rawText || !finalText) return [];
+  if (rawText.trim() === finalText.trim()) return [];
+
+  const rawWords = tokenize(rawText);
+  const finalWords = tokenize(finalText);
+  const matches = findLCS(rawWords, finalWords);
+  const corrections = [];
+
+  const extendedMatches = [
+    { i: -1, j: -1 },
+    ...matches,
+    { i: rawWords.length, j: finalWords.length }
+  ];
+
+  for (let k = 0; k < extendedMatches.length - 1; k++) {
+    const curr = extendedMatches[k];
+    const next = extendedMatches[k + 1];
+
+    const originalPhrase = rawWords.slice(curr.i + 1, next.i).join(' ');
+    const correctedPhrase = finalWords.slice(curr.j + 1, next.j).join(' ');
+
+    if (originalPhrase && correctedPhrase && originalPhrase !== correctedPhrase) {
+      const normalizedOriginal = normalize(originalPhrase);
+      const normalizedCorrected = normalize(correctedPhrase);
+
+      if (normalizedOriginal !== normalizedCorrected) {
+        corrections.push({
+          original: originalPhrase,
+          corrected: correctedPhrase
+        });
+      }
+    }
+  }
+
+  return corrections;
+}
+
+/**
+ * Apply learned corrections to text
+ */
+function applyCorrections(text, corrections, minCount = 2) {
+  if (!text || !corrections || corrections.length === 0) return text;
+
+  let result = text;
+
+  const sortedCorrections = [...corrections]
+    .filter(c => c.count >= minCount)
+    .sort((a, b) => b.original_token.length - a.original_token.length);
+
+  for (const correction of sortedCorrections) {
+    const original = correction.original_token;
+    const corrected = correction.corrected_token;
+
+    const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
+
+    result = result.replace(regex, corrected);
+  }
+
+  return result;
+}
+
+/**
+ * Get corrections from database
+ */
+async function getCorrections(minCount = 2) {
+  const { data, error } = await supabase
+    .from('corrections')
+    .select('*')
+    .eq('user_id', TEMP_USER_ID)
+    .eq('disabled', false)
+    .gte('count', minCount)
+    .order('count', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching corrections:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Save or update a correction
+ */
+async function saveCorrection(originalToken, correctedToken) {
+  // Check if correction already exists
+  const { data: existing } = await supabase
+    .from('corrections')
+    .select('*')
+    .eq('user_id', TEMP_USER_ID)
+    .eq('original_token', originalToken)
+    .eq('corrected_token', correctedToken)
+    .single();
+
+  if (existing) {
+    // Increment count
+    const { data, error } = await supabase
+      .from('corrections')
+      .update({
+        count: existing.count + 1,
+        last_seen_at: new Date().toISOString()
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } else {
+    // Create new correction
+    const id = `cor_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    const { data, error } = await supabase
+      .from('corrections')
+      .insert({
+        id,
+        user_id: TEMP_USER_ID,
+        original_token: originalToken,
+        corrected_token: correctedToken,
+        count: 1,
+        first_seen_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+        disabled: false
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+}
+
 // Route handlers
 async function handleHealth() {
   return jsonResponse(200, {
@@ -275,18 +467,35 @@ async function handleTranscribe(body) {
     }
   }
 
+  // Apply personalization (learned corrections) to the raw transcription
+  const rawText = transcription?.text || '';
+  let personalizedText = rawText;
+
+  if (supabase) {
+    try {
+      const corrections = await getCorrections(2);
+      if (corrections.length > 0) {
+        personalizedText = applyCorrections(rawText, corrections, 2);
+        console.log(`Applied ${corrections.length} correction(s) to transcription`);
+      }
+    } catch (persError) {
+      console.error('Personalization error:', persError);
+      // Continue with raw text if personalization fails
+    }
+  }
+
   // Save to Supabase
   let savedTranscript = null;
   if (supabase) {
     try {
-      const id = `tr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `tr_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const { data, error } = await supabase
         .from('transcripts')
         .insert({
           id,
           user_id: TEMP_USER_ID,
-          raw_text: transcription?.text || '',
-          personalized_text: transcription?.text || '',
+          raw_text: rawText,
+          personalized_text: personalizedText,
           audio_url: fileUrl,
           title: generatedTitle
         })
@@ -303,7 +512,8 @@ async function handleTranscribe(body) {
 
   return jsonResponse(200, {
     success: true,
-    transcription: transcription?.text || '',
+    transcription: personalizedText,
+    rawTranscription: rawText,
     language: 'en',
     title: generatedTitle,
     transcriptId: savedTranscript?.id || null,
@@ -360,6 +570,40 @@ async function handleUpdateTranscript(id, body) {
 
   const { finalText } = body;
 
+  // First, fetch the current transcript to get raw_text for correction extraction
+  const { data: existing, error: fetchError } = await supabase
+    .from('transcripts')
+    .select('raw_text')
+    .eq('id', id)
+    .eq('user_id', TEMP_USER_ID)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching transcript:', fetchError);
+    return errorResponse(500, 'Failed to fetch transcript');
+  }
+
+  // Extract corrections from the diff
+  if (existing?.raw_text && finalText) {
+    const corrections = extractCorrections(existing.raw_text, finalText);
+
+    // Save each correction
+    for (const correction of corrections) {
+      try {
+        await saveCorrection(correction.original, correction.corrected);
+        console.log('Correction saved:', correction.original, '->', correction.corrected);
+      } catch (corrError) {
+        console.error('Error saving correction:', corrError);
+        // Continue saving other corrections even if one fails
+      }
+    }
+
+    if (corrections.length > 0) {
+      console.log(`Extracted ${corrections.length} correction(s) from edit`);
+    }
+  }
+
+  // Update the transcript
   const { data, error } = await supabase
     .from('transcripts')
     .update({

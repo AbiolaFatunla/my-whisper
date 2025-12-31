@@ -294,12 +294,22 @@ app.post('/api/transcribe', async (req, res) => {
       }
     }
 
+    // Apply personalization (learned corrections) to the raw transcription
+    const rawText = transcription?.text || '';
+    let personalizedText = rawText;
+    try {
+      personalizedText = await database.personalizeText(rawText);
+    } catch (persError) {
+      console.error('Personalization error:', persError);
+      // Continue with raw text if personalization fails
+    }
+
     // Save to Supabase database
     let savedTranscript = null;
     try {
       savedTranscript = await database.saveTranscript({
-        rawText: transcription?.text || '',
-        personalizedText: transcription?.text || '',
+        rawText: rawText,
+        personalizedText: personalizedText,
         audioUrl: fileUrl,
         durationSeconds: null,
         title: generatedTitle
@@ -312,7 +322,8 @@ app.post('/api/transcribe', async (req, res) => {
 
     res.json({
       success: true,
-      transcription: transcription?.text || '',
+      transcription: personalizedText,
+      rawTranscription: rawText,
       language: 'en',
       title: generatedTitle,
       transcriptId: savedTranscript?.id || null,

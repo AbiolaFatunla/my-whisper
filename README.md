@@ -9,7 +9,7 @@ A personal voice dictation app powered by multiple AI models, with a learning al
 [![Secrets Detection](https://github.com/abiolafatunla/my-whisper/actions/workflows/secrets-scan.yml/badge.svg)](https://github.com/abiolafatunla/my-whisper/actions/workflows/secrets-scan.yml)
 ![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)
 
-> **Portfolio Project** - This code is shared for evaluation purposes only (job applications, interviews, professional assessment). Not open source. See [LICENSE](LICENSE) for terms.
+> **Portfolio Project** - This code is shared for evaluation purposes only (Professional assessment). Not open source. See [LICENSE](LICENSE) for terms.
 
 ## What This Is
 

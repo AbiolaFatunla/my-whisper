@@ -17,6 +17,7 @@ const playerTitle = document.getElementById('playerTitle');
 const audioPlayer = document.getElementById('audioPlayer');
 const modalTranscriptText = document.getElementById('modalTranscriptText');
 const closePlayer = document.getElementById('closePlayer');
+const saveModalTranscriptBtn = document.getElementById('saveModalTranscriptBtn');
 
 // Delete Modal Elements
 const deleteModal = document.getElementById('deleteModal');
@@ -27,6 +28,7 @@ const confirmDelete = document.getElementById('confirmDelete');
 // State
 let transcripts = [];
 let deleteTargetId = null;
+let modalTranscriptId = null;
 
 /**
  * Initialize the page
@@ -55,6 +57,9 @@ function setupEventListeners() {
   playerModal.addEventListener('click', (e) => {
     if (e.target === playerModal) closePlayerModal();
   });
+  if (saveModalTranscriptBtn) {
+    saveModalTranscriptBtn.addEventListener('click', saveModalTranscript);
+  }
 
   // Delete modal
   closeDelete.addEventListener('click', closeDeleteModal);
@@ -192,8 +197,13 @@ function openPlayerModal(id) {
   const transcript = transcripts.find(t => t.id === id);
   if (!transcript) return;
 
+  // Store transcript ID for saving edits
+  modalTranscriptId = id;
+
   playerTitle.textContent = transcript.title || 'Untitled Recording';
-  modalTranscriptText.textContent = transcript.raw_text || 'No transcription available';
+
+  // Use final_text if available, otherwise raw_text
+  modalTranscriptText.value = transcript.final_text || transcript.raw_text || '';
 
   // Set audio source - use proxy for S3 URLs
   if (transcript.audio_url) {
@@ -211,6 +221,43 @@ function closePlayerModal() {
   playerModal.style.display = 'none';
   audioPlayer.pause();
   audioPlayer.src = '';
+  modalTranscriptId = null;
+}
+
+/**
+ * Save transcript edits from modal
+ */
+async function saveModalTranscript() {
+  if (!modalTranscriptId) {
+    showToast('No transcript to save', 'error');
+    return;
+  }
+
+  const editedText = modalTranscriptText.value.trim();
+  if (!editedText) {
+    showToast('Cannot save empty transcript', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${config.apiUrl}/transcripts/${modalTranscriptId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ finalText: editedText })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save');
+    }
+
+    showToast('Saved');
+
+    // Refresh transcripts to show updated text
+    await loadTranscripts();
+  } catch (error) {
+    console.error('Save error:', error);
+    showToast('Failed to save', 'error');
+  }
 }
 
 /**
@@ -218,18 +265,20 @@ function closePlayerModal() {
  */
 async function copyTranscript(id) {
   const transcript = transcripts.find(t => t.id === id);
-  if (!transcript || !transcript.raw_text) {
+  const textToCopy = transcript?.final_text || transcript?.raw_text;
+
+  if (!textToCopy) {
     showToast('No text to copy', 'error');
     return;
   }
 
   try {
-    await navigator.clipboard.writeText(transcript.raw_text);
+    await navigator.clipboard.writeText(textToCopy);
     showToast('Copied to clipboard');
   } catch (error) {
     // Fallback for older browsers
     const textarea = document.createElement('textarea');
-    textarea.value = transcript.raw_text;
+    textarea.value = textToCopy;
     textarea.style.position = 'fixed';
     textarea.style.opacity = '0';
     document.body.appendChild(textarea);

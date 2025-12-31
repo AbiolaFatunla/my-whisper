@@ -149,9 +149,17 @@
                             </div>
                         </div>
 
-                        <div class="transcription-text" id="transcriptionText" style="display: none;"></div>
+                        <textarea class="transcription-text" id="transcriptionText" style="display: none;" placeholder="Your transcription will appear here..."></textarea>
 
                         <div class="transcription-actions" id="transcriptionActions" style="display: none;">
+                            <button class="transcription-btn transcription-btn-primary" id="saveTranscriptionBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                Save
+                            </button>
                             <button class="transcription-btn" id="copyTranscriptionBtn">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -231,7 +239,17 @@
             </div>
             <div class="modal-transcript" id="modalTranscript">
                 <h4>Transcription</h4>
-                <p id="modalTranscriptText"></p>
+                <textarea class="modal-transcript-text" id="modalTranscriptText" placeholder="No transcription available"></textarea>
+                <div class="modal-transcript-actions">
+                    <button class="transcription-btn transcription-btn-primary" id="saveModalTranscriptBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                        Save Changes
+                    </button>
+                </div>
             </div>
         </div>
     </div>

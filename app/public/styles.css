@@ -1615,8 +1615,20 @@ body::before {
   white-space: pre-wrap;
   word-wrap: break-word;
   max-height: 300px;
+  min-height: 120px;
   overflow-y: auto;
   margin-bottom: 16px;
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.transcription-text:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
 .transcription-text::-webkit-scrollbar {
@@ -1670,6 +1682,19 @@ body::before {
   color: white;
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+}
+
+.transcription-btn-primary {
+  background: var(--bg-gradient);
+  border-color: transparent;
+  color: white;
+}
+
+.transcription-btn-primary:hover {
+  background: linear-gradient(135deg, #ea580c 0%, #db2777 100%);
+  border-color: transparent;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 /* TLDR Section */
@@ -1769,6 +1794,36 @@ body::before {
   overflow-y: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+.modal-transcript-text {
+  width: 100%;
+  min-height: 150px;
+  max-height: 250px;
+  padding: 16px;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+  overflow-y: auto;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.modal-transcript-text:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.modal-transcript-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 
 /* Button Primary Style */

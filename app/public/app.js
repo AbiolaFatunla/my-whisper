@@ -29,6 +29,7 @@ const transcriptionActions = document.getElementById('transcriptionActions');
 const transcriptionTitle = document.getElementById('transcriptionTitle');
 const transcriptionTitleText = transcriptionTitle ? transcriptionTitle.querySelector('.title-text') : null;
 const transcriptionNote = document.getElementById('transcriptionNote');
+const saveTranscriptionBtn = document.getElementById('saveTranscriptionBtn');
 const copyTranscriptionBtn = document.getElementById('copyTranscriptionBtn');
 const downloadTranscriptionBtn = document.getElementById('downloadTranscriptionBtn');
 
@@ -39,6 +40,7 @@ let recordingStartTime = 0;
 let currentTranscription = null;
 let currentRecordingUrl = null;
 let currentRecordingTitle = null;
+let currentTranscriptId = null;
 
 /**
  * Initialize application
@@ -70,6 +72,11 @@ function setupEventListeners() {
   // Theme toggle
   if (themeToggle) {
     themeToggle.addEventListener('click', toggleTheme);
+  }
+
+  // Save transcription
+  if (saveTranscriptionBtn) {
+    saveTranscriptionBtn.addEventListener('click', saveTranscription);
   }
 
   // Copy transcription
@@ -267,9 +274,12 @@ function hideTranscriptionLoading() {
  */
 function showTranscription(text, title, transcriptId) {
   transcriptionLoading.style.display = 'none';
-  transcriptionText.textContent = text || 'No transcription available';
+  transcriptionText.value = text || '';
   transcriptionText.style.display = 'block';
   transcriptionActions.style.display = 'flex';
+
+  // Store transcript ID for saving edits
+  currentTranscriptId = transcriptId;
 
   // Show title if available
   if (title && transcriptionTitle && transcriptionTitleText) {
@@ -306,13 +316,53 @@ function resetRecordingUI() {
 }
 
 /**
+ * Save transcription edits
+ */
+async function saveTranscription() {
+  if (!currentTranscriptId) {
+    showToast('No transcript to save');
+    return;
+  }
+
+  const editedText = transcriptionText.value.trim();
+  if (!editedText) {
+    showToast('Cannot save empty transcript');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${config.apiUrl}/transcripts/${currentTranscriptId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ finalText: editedText })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save');
+    }
+
+    // Update current transcription state
+    currentTranscription = editedText;
+
+    showToast('Saved');
+
+    // Refresh history to show updated text
+    loadHistory();
+  } catch (error) {
+    console.error('Save error:', error);
+    showToast('Failed to save');
+  }
+}
+
+/**
  * Copy transcription to clipboard
  */
 async function copyTranscription() {
-  if (!currentTranscription) return;
+  const text = transcriptionText.value || currentTranscription;
+  if (!text) return;
 
   try {
-    const success = await S3Uploader.copyToClipboard(currentTranscription);
+    const success = await S3Uploader.copyToClipboard(text);
     if (success) {
       showToast('Copied to clipboard');
     } else {
@@ -328,13 +378,14 @@ async function copyTranscription() {
  * Download transcription as text file
  */
 function downloadTranscription() {
-  if (!currentTranscription) return;
+  const text = transcriptionText.value || currentTranscription;
+  if (!text) return;
 
   const filename = currentRecordingTitle
     ? `${currentRecordingTitle.replace(/[^a-z0-9]/gi, '_')}.txt`
     : 'transcription.txt';
 
-  const blob = new Blob([currentTranscription], { type: 'text/plain' });
+  const blob = new Blob([text], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement('a');
@@ -416,6 +467,7 @@ const playerTitle = document.getElementById('playerTitle');
 const audioPlayer = document.getElementById('audioPlayer');
 const closePlayer = document.getElementById('closePlayer');
 const modalTranscriptText = document.getElementById('modalTranscriptText');
+const saveModalTranscriptBtn = document.getElementById('saveModalTranscriptBtn');
 
 // Delete Modal Elements
 const deleteModal = document.getElementById('deleteModal');
@@ -426,6 +478,7 @@ const confirmDelete = document.getElementById('confirmDelete');
 // History State
 let transcripts = [];
 let deleteTargetId = null;
+let modalTranscriptId = null;
 
 /**
  * Load transcripts from API
@@ -574,6 +627,9 @@ function openPlayerModal(id) {
   const transcript = transcripts.find(t => t.id === id);
   if (!transcript || !playerModal) return;
 
+  // Store transcript ID for saving edits
+  modalTranscriptId = id;
+
   playerTitle.textContent = transcript.title || 'Untitled Recording';
 
   // Set audio source using proxy for S3 URLs
@@ -582,9 +638,9 @@ function openPlayerModal(id) {
     audioPlayer.src = audioUrl;
   }
 
-  // Set transcript text
+  // Set transcript text - use final_text if available, otherwise raw_text
   if (modalTranscriptText) {
-    modalTranscriptText.textContent = transcript.raw_text || 'No transcription available';
+    modalTranscriptText.value = transcript.final_text || transcript.raw_text || '';
   }
 
   playerModal.style.display = 'flex';
@@ -598,6 +654,43 @@ function closePlayerModal() {
   playerModal.style.display = 'none';
   audioPlayer.pause();
   audioPlayer.src = '';
+  modalTranscriptId = null;
+}
+
+/**
+ * Save transcript edits from modal
+ */
+async function saveModalTranscript() {
+  if (!modalTranscriptId) {
+    showToast('No transcript to save');
+    return;
+  }
+
+  const editedText = modalTranscriptText.value.trim();
+  if (!editedText) {
+    showToast('Cannot save empty transcript');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${config.apiUrl}/transcripts/${modalTranscriptId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ finalText: editedText })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save');
+    }
+
+    showToast('Saved');
+
+    // Refresh history to show updated text
+    await loadHistory();
+  } catch (error) {
+    console.error('Save error:', error);
+    showToast('Failed to save');
+  }
 }
 
 /**
@@ -605,13 +698,15 @@ function closePlayerModal() {
  */
 async function copyHistoryTranscript(id) {
   const transcript = transcripts.find(t => t.id === id);
-  if (!transcript || !transcript.raw_text) {
+  const textToCopy = transcript?.final_text || transcript?.raw_text;
+
+  if (!textToCopy) {
     showToast('No text to copy');
     return;
   }
 
   try {
-    await navigator.clipboard.writeText(transcript.raw_text);
+    await navigator.clipboard.writeText(textToCopy);
     showToast('Copied to clipboard');
   } catch (error) {
     showToast('Failed to copy');
@@ -718,6 +813,9 @@ function setupHistoryEventListeners() {
     playerModal.addEventListener('click', (e) => {
       if (e.target === playerModal) closePlayerModal();
     });
+  }
+  if (saveModalTranscriptBtn) {
+    saveModalTranscriptBtn.addEventListener('click', saveModalTranscript);
   }
 
   // Delete modal

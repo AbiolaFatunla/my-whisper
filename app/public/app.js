@@ -9,6 +9,13 @@ const uploader = new S3Uploader();
 
 console.log('My Whisper loaded');
 
+// Auth UI Elements
+const signInBtn = document.getElementById('signInBtn');
+const signOutBtn = document.getElementById('signOutBtn');
+const userMenu = document.getElementById('userMenu');
+const userAvatar = document.getElementById('userAvatar');
+const userName = document.getElementById('userName');
+
 // DOM Elements
 const recordButton = document.getElementById('recordButton');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -56,10 +63,101 @@ async function init() {
   // Initialize theme
   initTheme();
 
+  // Initialize auth
+  await initAuth();
+
   // Set up event listeners
   setupEventListeners();
+  setupAuthEventListeners();
 
   console.log('App initialized');
+}
+
+/**
+ * Initialize authentication
+ */
+async function initAuth() {
+  try {
+    await auth.init();
+    updateAuthUI();
+
+    // Listen for auth state changes
+    auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event);
+      updateAuthUI();
+
+      // Reload history when user signs in/out to show their recordings
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        loadHistory();
+      }
+    });
+  } catch (error) {
+    console.error('Auth init error:', error);
+    // Continue without auth - anonymous mode
+    updateAuthUI();
+  }
+}
+
+/**
+ * Update auth UI based on current state
+ */
+function updateAuthUI() {
+  const user = auth.getUser();
+
+  if (user) {
+    // User is signed in
+    if (signInBtn) signInBtn.style.display = 'none';
+    if (userMenu) userMenu.style.display = 'flex';
+    if (userAvatar) {
+      userAvatar.src = user.user_metadata?.avatar_url || '';
+      userAvatar.style.display = user.user_metadata?.avatar_url ? 'block' : 'none';
+    }
+    if (userName) {
+      userName.textContent = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+    }
+  } else {
+    // User is not signed in (anonymous mode)
+    if (signInBtn) signInBtn.style.display = 'flex';
+    if (userMenu) userMenu.style.display = 'none';
+  }
+}
+
+/**
+ * Set up auth event listeners
+ */
+function setupAuthEventListeners() {
+  if (signInBtn) {
+    signInBtn.addEventListener('click', handleSignIn);
+  }
+
+  if (signOutBtn) {
+    signOutBtn.addEventListener('click', handleSignOut);
+  }
+}
+
+/**
+ * Handle sign in button click
+ */
+async function handleSignIn() {
+  try {
+    await auth.signInWithGoogle();
+  } catch (error) {
+    console.error('Sign in failed:', error);
+    showToast('Sign in failed');
+  }
+}
+
+/**
+ * Handle sign out button click
+ */
+async function handleSignOut() {
+  try {
+    await auth.signOut();
+    showToast('Signed out');
+  } catch (error) {
+    console.error('Sign out failed:', error);
+    showToast('Sign out failed');
+  }
 }
 
 /**
@@ -188,7 +286,7 @@ async function transcribeAudio(audioUrl) {
     hideUploadProgress();
     showTranscriptionLoading();
 
-    const response = await fetch(`${config.apiUrl}/transcribe`, {
+    const response = await authFetch(`${config.apiUrl}/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileUrl: audioUrl })
@@ -331,7 +429,7 @@ async function saveTranscription() {
   }
 
   try {
-    const response = await fetch(`${config.apiUrl}/transcripts/${currentTranscriptId}`, {
+    const response = await authFetch(`${config.apiUrl}/transcripts/${currentTranscriptId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ finalText: editedText })
@@ -489,7 +587,7 @@ async function loadHistory() {
   showHistoryLoading();
 
   try {
-    const response = await fetch(`${config.apiUrl}/transcripts`);
+    const response = await authFetch(`${config.apiUrl}/transcripts`);
 
     if (!response.ok) {
       throw new Error('Failed to load transcripts');
@@ -673,7 +771,7 @@ async function saveModalTranscript() {
   }
 
   try {
-    const response = await fetch(`${config.apiUrl}/transcripts/${modalTranscriptId}`, {
+    const response = await authFetch(`${config.apiUrl}/transcripts/${modalTranscriptId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ finalText: editedText })
@@ -779,7 +877,7 @@ async function handleConfirmDelete() {
   if (!deleteTargetId) return;
 
   try {
-    const response = await fetch(`${config.apiUrl}/transcripts/${deleteTargetId}`, {
+    const response = await authFetch(`${config.apiUrl}/transcripts/${deleteTargetId}`, {
       method: 'DELETE'
     });
 

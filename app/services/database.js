@@ -37,24 +37,20 @@ function generateId() {
 
 /**
  * Save a new transcript to the database
- * Note: For Phase 1, we use a temporary user_id since auth isn't implemented yet
  */
-async function saveTranscript({ rawText, personalizedText, audioUrl, durationSeconds, title }) {
+async function saveTranscript({ userId, rawText, personalizedText, audioUrl, durationSeconds, title }) {
   const client = initSupabase();
   if (!client) {
     throw new Error('Database not initialized');
   }
 
   const id = generateId();
-  // Temporary user_id for Phase 1 (before auth is implemented)
-  // This will be replaced with actual auth.uid() in Phase 5
-  const tempUserId = process.env.TEMP_USER_ID || '00000000-0000-0000-0000-000000000000';
 
   const { data, error } = await client
     .from('transcripts')
     .insert({
       id,
-      user_id: tempUserId,
+      user_id: userId,
       raw_text: rawText,
       personalized_text: personalizedText || rawText,
       final_text: null,
@@ -100,21 +96,19 @@ async function getTranscript(id) {
 }
 
 /**
- * Get all transcripts for the current user
+ * Get all transcripts for a user
  * Sorted by created_at descending (newest first)
  */
-async function getTranscripts(limit = 50, offset = 0) {
+async function getTranscripts(userId, limit = 50, offset = 0) {
   const client = initSupabase();
   if (!client) {
     throw new Error('Database not initialized');
   }
 
-  const tempUserId = process.env.TEMP_USER_ID || '00000000-0000-0000-0000-000000000000';
-
   const { data, error } = await client
     .from('transcripts')
     .select('*')
-    .eq('user_id', tempUserId)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -130,7 +124,7 @@ async function getTranscripts(limit = 50, offset = 0) {
  * Update a transcript (for editing)
  * Also extracts corrections by comparing raw_text with finalText
  */
-async function updateTranscript(id, { finalText }) {
+async function updateTranscript(userId, id, { finalText }) {
   const client = initSupabase();
   if (!client) {
     throw new Error('Database not initialized');
@@ -141,6 +135,7 @@ async function updateTranscript(id, { finalText }) {
     .from('transcripts')
     .select('raw_text')
     .eq('id', id)
+    .eq('user_id', userId)
     .single();
 
   if (fetchError) {
@@ -155,7 +150,7 @@ async function updateTranscript(id, { finalText }) {
     // Save each correction
     for (const correction of corrections) {
       try {
-        await saveCorrection({
+        await saveCorrection(userId, {
           originalToken: correction.original,
           correctedToken: correction.corrected
         });
@@ -179,6 +174,7 @@ async function updateTranscript(id, { finalText }) {
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
+    .eq('user_id', userId)
     .select()
     .single();
 
@@ -193,7 +189,7 @@ async function updateTranscript(id, { finalText }) {
 /**
  * Delete a transcript
  */
-async function deleteTranscript(id) {
+async function deleteTranscript(userId, id) {
   const client = initSupabase();
   if (!client) {
     throw new Error('Database not initialized');
@@ -202,7 +198,8 @@ async function deleteTranscript(id) {
   const { error } = await client
     .from('transcripts')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('user_id', userId);
 
   if (error) {
     console.error('Error deleting transcript:', error);
@@ -213,20 +210,18 @@ async function deleteTranscript(id) {
 }
 
 /**
- * Get all corrections for the current user
+ * Get all corrections for a user
  */
-async function getCorrections(minCount = 2) {
+async function getCorrections(userId, minCount = 2) {
   const client = initSupabase();
   if (!client) {
     throw new Error('Database not initialized');
   }
 
-  const tempUserId = process.env.TEMP_USER_ID || '00000000-0000-0000-0000-000000000000';
-
   const { data, error } = await client
     .from('corrections')
     .select('*')
-    .eq('user_id', tempUserId)
+    .eq('user_id', userId)
     .eq('disabled', false)
     .gte('count', minCount)
     .order('count', { ascending: false });
@@ -242,19 +237,17 @@ async function getCorrections(minCount = 2) {
 /**
  * Save or update a correction
  */
-async function saveCorrection({ originalToken, correctedToken }) {
+async function saveCorrection(userId, { originalToken, correctedToken }) {
   const client = initSupabase();
   if (!client) {
     throw new Error('Database not initialized');
   }
 
-  const tempUserId = process.env.TEMP_USER_ID || '00000000-0000-0000-0000-000000000000';
-
   // Check if correction already exists
   const { data: existing } = await client
     .from('corrections')
     .select('*')
-    .eq('user_id', tempUserId)
+    .eq('user_id', userId)
     .eq('original_token', originalToken)
     .eq('corrected_token', correctedToken)
     .single();
@@ -280,7 +273,7 @@ async function saveCorrection({ originalToken, correctedToken }) {
       .from('corrections')
       .insert({
         id,
-        user_id: tempUserId,
+        user_id: userId,
         original_token: originalToken,
         corrected_token: correctedToken,
         count: 1,
@@ -300,11 +293,11 @@ async function saveCorrection({ originalToken, correctedToken }) {
  * Apply personalization to text using learned corrections
  * Fetches corrections from DB and applies those with count >= minCount
  */
-async function personalizeText(text, minCount = 2) {
+async function personalizeText(userId, text, minCount = 2) {
   if (!text) return text;
 
   try {
-    const corrections = await getCorrections(minCount);
+    const corrections = await getCorrections(userId, minCount);
 
     if (corrections.length === 0) {
       return text;

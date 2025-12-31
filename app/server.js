@@ -31,7 +31,7 @@ const limiter = rateLimit({
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Range'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Range', 'X-Anonymous-ID'],
   exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length']
 }));
 app.use(express.json());
@@ -138,6 +138,47 @@ function cleanGeneratedTitle(title) {
     .join(' ');
 }
 
+// Temporary user ID for backwards compatibility during auth transition
+const TEMP_USER_ID = '00000000-0000-0000-0000-000000000001';
+
+/**
+ * Extract user ID from request headers
+ * Priority: 1. JWT token (authenticated user) 2. Anonymous ID header
+ */
+function getUserIdFromHeaders(req) {
+  // Check for Authorization header (JWT from Supabase Auth)
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      // Decode JWT payload (base64) - we don't verify here since Supabase RLS does that
+      const payloadBase64 = token.split('.')[1];
+      const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
+      if (payload.sub) {
+        console.log('Using authenticated user ID:', payload.sub);
+        return payload.sub;
+      }
+    } catch (e) {
+      console.error('Failed to decode JWT:', e.message);
+    }
+  }
+
+  // Fall back to anonymous ID header
+  const anonymousId = req.headers['x-anonymous-id'];
+  if (anonymousId) {
+    // Validate it looks like a UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(anonymousId)) {
+      console.log('Using anonymous user ID:', anonymousId);
+      return anonymousId;
+    }
+  }
+
+  // Fall back to temp user ID (for backwards compatibility)
+  console.log('No user ID found, using TEMP_USER_ID');
+  return TEMP_USER_ID;
+}
+
 // ================================
 // API ROUTES
 // ================================
@@ -239,6 +280,7 @@ app.post('/api/move-to-shared', async (req, res) => {
 app.post('/api/transcribe', async (req, res) => {
   try {
     const { fileUrl } = req.body;
+    const userId = getUserIdFromHeaders(req);
 
     if (!fileUrl) {
       return res.status(400).json({ error: 'File URL is required' });
@@ -298,7 +340,7 @@ app.post('/api/transcribe', async (req, res) => {
     const rawText = transcription?.text || '';
     let personalizedText = rawText;
     try {
-      personalizedText = await database.personalizeText(rawText);
+      personalizedText = await database.personalizeText(userId, rawText);
     } catch (persError) {
       console.error('Personalization error:', persError);
       // Continue with raw text if personalization fails
@@ -308,6 +350,7 @@ app.post('/api/transcribe', async (req, res) => {
     let savedTranscript = null;
     try {
       savedTranscript = await database.saveTranscript({
+        userId: userId,
         rawText: rawText,
         personalizedText: personalizedText,
         audioUrl: fileUrl,
@@ -341,10 +384,11 @@ app.post('/api/transcribe', async (req, res) => {
  */
 app.get('/api/transcripts', async (req, res) => {
   try {
+    const userId = getUserIdFromHeaders(req);
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
 
-    const transcripts = await database.getTranscripts(limit, offset);
+    const transcripts = await database.getTranscripts(userId, limit, offset);
     res.json({ transcripts });
   } catch (error) {
     console.error('Error fetching transcripts:', error);
@@ -373,8 +417,9 @@ app.get('/api/transcripts/:id', async (req, res) => {
  */
 app.put('/api/transcripts/:id', async (req, res) => {
   try {
+    const userId = getUserIdFromHeaders(req);
     const { finalText } = req.body;
-    const transcript = await database.updateTranscript(req.params.id, { finalText });
+    const transcript = await database.updateTranscript(userId, req.params.id, { finalText });
     res.json({ transcript });
   } catch (error) {
     console.error('Error updating transcript:', error);
@@ -387,7 +432,8 @@ app.put('/api/transcripts/:id', async (req, res) => {
  */
 app.delete('/api/transcripts/:id', async (req, res) => {
   try {
-    await database.deleteTranscript(req.params.id);
+    const userId = getUserIdFromHeaders(req);
+    await database.deleteTranscript(userId, req.params.id);
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting transcript:', error);

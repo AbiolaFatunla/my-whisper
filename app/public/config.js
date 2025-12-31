@@ -19,8 +19,8 @@ const config = {
 
   // Supabase config (for direct client access if needed)
   supabase: {
-    url: 'https://ohtrhcksobxspcnqxkbz.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9odHJoY2tzb2J4c3BjbnF4a2J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUzNDQ2ODUsImV4cCI6MjA1MDkyMDY4NX0.xeligGHv0KAyT5yOSJcgYgYAkrfno0wFqXgwHCHKdhA'
+    url: 'https://vjimmmnexookthrdxrkz.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqaW1tbW5leG9va3RocmR4cmt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDY0MjIsImV4cCI6MjA4MjUyMjQyMn0.YpREejftePiXJkQx6KOsBPicaMAABNLun9NyjfHzghM'
   }
 };
 

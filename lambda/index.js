@@ -41,11 +41,56 @@ function jsonResponse(statusCode, body) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Anonymous-ID',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
     },
     body: JSON.stringify(body)
   };
+}
+
+/**
+ * Extract user ID from request headers
+ * Priority: 1. JWT token (authenticated user) 2. Anonymous ID header
+ */
+function getUserIdFromHeaders(headers) {
+  // Normalize header keys to lowercase
+  const normalizedHeaders = {};
+  for (const [key, value] of Object.entries(headers || {})) {
+    normalizedHeaders[key.toLowerCase()] = value;
+  }
+
+  // Check for Authorization header (JWT from Supabase Auth)
+  const authHeader = normalizedHeaders['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      // Decode JWT payload (base64) - we don't verify here since Supabase RLS does that
+      // For Lambda with service role, we just need the user ID
+      const payloadBase64 = token.split('.')[1];
+      const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
+      if (payload.sub) {
+        console.log('Using authenticated user ID:', payload.sub);
+        return payload.sub;
+      }
+    } catch (e) {
+      console.error('Failed to decode JWT:', e.message);
+    }
+  }
+
+  // Fall back to anonymous ID header
+  const anonymousId = normalizedHeaders['x-anonymous-id'];
+  if (anonymousId) {
+    // Validate it looks like a UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(anonymousId)) {
+      console.log('Using anonymous user ID:', anonymousId);
+      return anonymousId;
+    }
+  }
+
+  // Fall back to temp user ID (for backwards compatibility during transition)
+  console.log('No user ID found, using TEMP_USER_ID');
+  return TEMP_USER_ID;
 }
 
 function errorResponse(statusCode, message) {
@@ -141,8 +186,8 @@ async function downloadFromS3(fileUrl) {
   return Buffer.from(buffer);
 }
 
-// Temporary user ID for development (replaced with auth in Phase 5)
-// Must match the RLS bypass policy in Supabase
+// Temporary user ID for backwards compatibility during auth transition
+// Will be removed once all users have anonymous IDs
 const TEMP_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 // ================================
@@ -270,11 +315,11 @@ function applyCorrections(text, corrections, minCount = 2) {
 /**
  * Get corrections from database
  */
-async function getCorrections(minCount = 2) {
+async function getCorrections(userId, minCount = 2) {
   const { data, error } = await supabase
     .from('corrections')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', userId)
     .eq('disabled', false)
     .gte('count', minCount)
     .order('count', { ascending: false });
@@ -290,12 +335,12 @@ async function getCorrections(minCount = 2) {
 /**
  * Save or update a correction
  */
-async function saveCorrection(originalToken, correctedToken) {
+async function saveCorrection(userId, originalToken, correctedToken) {
   // Check if correction already exists
   const { data: existing } = await supabase
     .from('corrections')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', userId)
     .eq('original_token', originalToken)
     .eq('corrected_token', correctedToken)
     .single();
@@ -321,7 +366,7 @@ async function saveCorrection(originalToken, correctedToken) {
       .from('corrections')
       .insert({
         id,
-        user_id: TEMP_USER_ID,
+        user_id: userId,
         original_token: originalToken,
         corrected_token: correctedToken,
         count: 1,
@@ -410,7 +455,7 @@ async function handleMoveToShared(body) {
   });
 }
 
-async function handleTranscribe(body) {
+async function handleTranscribe(body, userId) {
   const { fileUrl } = body;
 
   if (!fileUrl) {
@@ -473,7 +518,7 @@ async function handleTranscribe(body) {
 
   if (supabase) {
     try {
-      const corrections = await getCorrections(2);
+      const corrections = await getCorrections(userId, 2);
       if (corrections.length > 0) {
         personalizedText = applyCorrections(rawText, corrections, 2);
         console.log(`Applied ${corrections.length} correction(s) to transcription`);
@@ -493,7 +538,7 @@ async function handleTranscribe(body) {
         .from('transcripts')
         .insert({
           id,
-          user_id: TEMP_USER_ID,
+          user_id: userId,
           raw_text: rawText,
           personalized_text: personalizedText,
           audio_url: fileUrl,
@@ -521,7 +566,7 @@ async function handleTranscribe(body) {
   });
 }
 
-async function handleGetTranscripts(queryParams) {
+async function handleGetTranscripts(queryParams, userId) {
   if (!supabase) {
     return errorResponse(500, 'Database not configured');
   }
@@ -532,7 +577,7 @@ async function handleGetTranscripts(queryParams) {
   const { data, error } = await supabase
     .from('transcripts')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -544,7 +589,7 @@ async function handleGetTranscripts(queryParams) {
   return jsonResponse(200, { transcripts: data });
 }
 
-async function handleGetTranscript(id) {
+async function handleGetTranscript(id, userId) {
   if (!supabase) {
     return errorResponse(500, 'Database not configured');
   }
@@ -553,7 +598,7 @@ async function handleGetTranscript(id) {
     .from('transcripts')
     .select('*')
     .eq('id', id)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', userId)
     .single();
 
   if (error || !data) {
@@ -563,7 +608,7 @@ async function handleGetTranscript(id) {
   return jsonResponse(200, { transcript: data });
 }
 
-async function handleUpdateTranscript(id, body) {
+async function handleUpdateTranscript(id, body, userId) {
   if (!supabase) {
     return errorResponse(500, 'Database not configured');
   }
@@ -575,7 +620,7 @@ async function handleUpdateTranscript(id, body) {
     .from('transcripts')
     .select('raw_text')
     .eq('id', id)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', userId)
     .single();
 
   if (fetchError) {
@@ -590,7 +635,7 @@ async function handleUpdateTranscript(id, body) {
     // Save each correction
     for (const correction of corrections) {
       try {
-        await saveCorrection(correction.original, correction.corrected);
+        await saveCorrection(userId, correction.original, correction.corrected);
         console.log('Correction saved:', correction.original, '->', correction.corrected);
       } catch (corrError) {
         console.error('Error saving correction:', corrError);
@@ -611,7 +656,7 @@ async function handleUpdateTranscript(id, body) {
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', userId)
     .select()
     .single();
 
@@ -623,7 +668,7 @@ async function handleUpdateTranscript(id, body) {
   return jsonResponse(200, { transcript: data });
 }
 
-async function handleDeleteTranscript(id) {
+async function handleDeleteTranscript(id, userId) {
   if (!supabase) {
     return errorResponse(500, 'Database not configured');
   }
@@ -632,7 +677,7 @@ async function handleDeleteTranscript(id) {
     .from('transcripts')
     .delete()
     .eq('id', id)
-    .eq('user_id', TEMP_USER_ID);
+    .eq('user_id', userId);
 
   if (error) {
     console.error('Error deleting transcript:', error);
@@ -645,6 +690,7 @@ async function handleDeleteTranscript(id) {
 /**
  * Public share endpoint - returns transcript data for shared links
  * No auth required, read-only access to specific fields only
+ * Note: This endpoint is intentionally public - anyone with the ID can view
  */
 async function handlePublicShare(id) {
   if (!supabase) {
@@ -655,13 +701,12 @@ async function handlePublicShare(id) {
     return errorResponse(400, 'Transcript ID is required');
   }
 
-  // Fetch transcript - must include user_id filter to satisfy RLS policy
-  // Currently all transcripts use TEMP_USER_ID, later this will need auth
+  // Fetch transcript - no user_id filter since this is a public share
+  // Security: Only expose limited fields, not the full transcript record
   const { data, error } = await supabase
     .from('transcripts')
     .select('id, title, raw_text, audio_url, created_at')
     .eq('id', id)
-    .eq('user_id', TEMP_USER_ID)
     .single();
 
   if (error || !data) {
@@ -723,11 +768,15 @@ exports.handler = async (event) => {
 
   const method = event.requestContext?.http?.method || event.httpMethod;
   const rawPath = event.rawPath || event.path || '';
+  const headers = event.headers || {};
 
   // Handle CORS preflight
   if (method === 'OPTIONS') {
     return jsonResponse(200, {});
   }
+
+  // Extract user ID from headers (JWT or anonymous ID)
+  const userId = getUserIdFromHeaders(headers);
 
   // Parse body if present
   let body = {};
@@ -762,11 +811,11 @@ exports.handler = async (event) => {
     }
 
     if (path === '/transcribe' && method === 'POST') {
-      return await handleTranscribe(body);
+      return await handleTranscribe(body, userId);
     }
 
     if (path === '/transcripts' && method === 'GET') {
-      return await handleGetTranscripts(queryParams);
+      return await handleGetTranscripts(queryParams, userId);
     }
 
     if (path === '/audio-proxy' && method === 'GET') {
@@ -785,13 +834,13 @@ exports.handler = async (event) => {
       const id = transcriptMatch[1];
 
       if (method === 'GET') {
-        return await handleGetTranscript(id);
+        return await handleGetTranscript(id, userId);
       }
       if (method === 'PUT') {
-        return await handleUpdateTranscript(id, body);
+        return await handleUpdateTranscript(id, body, userId);
       }
       if (method === 'DELETE') {
-        return await handleDeleteTranscript(id);
+        return await handleDeleteTranscript(id, userId);
       }
     }
 

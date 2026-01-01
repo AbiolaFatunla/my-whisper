@@ -35,10 +35,11 @@ The app learns from your corrections through a feedback loop. When you fix an er
 
 **How it works:**
 
-1. **Extraction**: When you save an edited transcript, the system computes a diff using the Longest Common Subsequence (LCS) algorithm to identify phrase-level changes
-2. **Storage**: Each correction is stored with a count that increments on repeat occurrences
-3. **Application**: Corrections with count >= 2 are automatically applied to future transcriptions
-4. **Confidence**: The count threshold prevents one-off typos from becoming permanent corrections
+1. **Alignment**: When you save an edited transcript, the system uses the Longest Common Subsequence (LCS) algorithm to align the original and edited text
+2. **Decomposition**: Where possible, multi-word changes get broken down into individual word corrections. If I correct "the quik brown fox" to "the quick brown fox", the system extracts just "quik -> quick" rather than storing the whole phrase
+3. **Storage**: Each correction is stored with a count that increments on repeat occurrences
+4. **Application**: Corrections with count >= 2 are automatically applied to future transcriptions
+5. **Confidence**: The count threshold prevents one-off typos from becoming permanent corrections
 
 This approach means the system genuinely improves for each user's specific vocabulary and speech patterns, without any cloud-based ML training.
 
@@ -193,7 +194,7 @@ This approach means the system genuinely improves for each user's specific vocab
 3. Lambda computes diff between raw_text and finalText
    │
    ▼
-4. Lambda extracts phrase-level corrections (LCS algorithm)
+4. Lambda extracts corrections (word-level where possible, phrase-level otherwise)
    │
    ▼
 5. Lambda upserts corrections to Supabase

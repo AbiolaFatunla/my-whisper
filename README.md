@@ -15,7 +15,7 @@ A personal voice dictation app powered by multiple AI models, with a learning al
 
 I built this because I wanted a voice transcription tool that actually learns from my corrections. The idea is simple: when I fix a transcription error, the system remembers it. Make the same correction twice, and from the third time onwards it auto-applies. Over time, it becomes personalised to how I speak.
 
-The app integrates two AI models - Whisper for transcription and GPT-4o-mini for title generation - alongside a phrase-matching algorithm that learns from your corrections. Built with Supabase for persistence and a vanilla JavaScript frontend with glassmorphism design.
+The app integrates two AI models - Whisper for transcription and GPT-4o-mini for title generation - alongside a matching algorithm that learns from your corrections at the word level. Built with Supabase for persistence and a vanilla JavaScript frontend with glassmorphism design.
 
 ## Architecture
 

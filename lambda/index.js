@@ -273,7 +273,42 @@ function findLCS(words1, words2) {
 }
 
 /**
+ * Strip punctuation from word for matching
+ */
+function stripPunctuation(word) {
+  return word.replace(/^[.,!?;:'"]+|[.,!?;:'"]+$/g, '');
+}
+
+/**
+ * Decompose a phrase correction into word-level corrections
+ * Only works when original and corrected have equal word counts
+ */
+function decomposePhraseToWords(originalWords, correctedWords) {
+  const wordCorrections = [];
+
+  for (let i = 0; i < originalWords.length; i++) {
+    const original = originalWords[i];
+    const corrected = correctedWords[i];
+
+    // Compare without punctuation
+    const originalClean = stripPunctuation(original);
+    const correctedClean = stripPunctuation(corrected);
+
+    // Only add if actually different (case-insensitive comparison)
+    if (originalClean.toLowerCase() !== correctedClean.toLowerCase()) {
+      wordCorrections.push({
+        original: originalClean,
+        corrected: correctedClean
+      });
+    }
+  }
+
+  return wordCorrections;
+}
+
+/**
  * Extract corrections by comparing raw text with edited text
+ * Uses LCS for alignment, then decomposes equal-length phrases into word-level corrections
  */
 function extractCorrections(rawText, finalText) {
   if (!rawText || !finalText) return [];
@@ -294,10 +329,31 @@ function extractCorrections(rawText, finalText) {
     const curr = extendedMatches[k];
     const next = extendedMatches[k + 1];
 
-    const originalPhrase = rawWords.slice(curr.i + 1, next.i).join(' ');
-    const correctedPhrase = finalWords.slice(curr.j + 1, next.j).join(' ');
+    // Words between current match and next match are differences
+    const rawStart = curr.i + 1;
+    const rawEnd = next.i;
+    const finalStart = curr.j + 1;
+    const finalEnd = next.j;
 
-    if (originalPhrase && correctedPhrase && originalPhrase !== correctedPhrase) {
+    // Extract the differing word arrays
+    const originalWordArray = rawWords.slice(rawStart, rawEnd);
+    const correctedWordArray = finalWords.slice(finalStart, finalEnd);
+
+    // Skip if either side is empty (pure insertion or deletion)
+    if (originalWordArray.length === 0 || correctedWordArray.length === 0) {
+      continue;
+    }
+
+    // Check if word counts are equal - if so, decompose into word pairs
+    if (originalWordArray.length === correctedWordArray.length) {
+      // Decompose into word-level corrections
+      const wordCorrections = decomposePhraseToWords(originalWordArray, correctedWordArray);
+      corrections.push(...wordCorrections);
+    } else {
+      // Unequal word counts - keep as phrase correction
+      const originalPhrase = originalWordArray.join(' ');
+      const correctedPhrase = correctedWordArray.join(' ');
+
       const normalizedOriginal = normalize(originalPhrase);
       const normalizedCorrected = normalize(correctedPhrase);
 

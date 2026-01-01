@@ -60,8 +60,47 @@ function findLCS(words1, words2) {
 }
 
 /**
+ * Strip punctuation from word for matching, preserving for output
+ */
+function stripPunctuation(word) {
+  return word.replace(/^[.,!?;:'"]+|[.,!?;:'"]+$/g, '');
+}
+
+/**
+ * Decompose a phrase correction into word-level corrections
+ * Only works when original and corrected have equal word counts
+ *
+ * @param {string[]} originalWords - Words from original phrase
+ * @param {string[]} correctedWords - Words from corrected phrase
+ * @returns {Array<{original: string, corrected: string}>} Word-level corrections
+ */
+function decomposePhraseToWords(originalWords, correctedWords) {
+  const wordCorrections = [];
+
+  for (let i = 0; i < originalWords.length; i++) {
+    const original = originalWords[i];
+    const corrected = correctedWords[i];
+
+    // Compare without punctuation
+    const originalClean = stripPunctuation(original);
+    const correctedClean = stripPunctuation(corrected);
+
+    // Only add if actually different (case-insensitive comparison)
+    if (originalClean.toLowerCase() !== correctedClean.toLowerCase()) {
+      // Store without trailing punctuation for cleaner matching
+      wordCorrections.push({
+        original: originalClean,
+        corrected: correctedClean
+      });
+    }
+  }
+
+  return wordCorrections;
+}
+
+/**
  * Extract corrections by comparing raw text with edited text
- * Uses phrase-level matching to capture multi-word corrections
+ * Uses LCS for alignment, then decomposes equal-length phrases into word-level corrections
  *
  * @param {string} rawText - Original transcription from Whisper
  * @param {string} finalText - User-edited text
@@ -99,14 +138,25 @@ function extractCorrections(rawText, finalText) {
     const finalStart = curr.j + 1;
     const finalEnd = next.j;
 
-    // Extract the differing portions
-    const originalPhrase = rawWords.slice(rawStart, rawEnd).join(' ');
-    const correctedPhrase = finalWords.slice(finalStart, finalEnd).join(' ');
+    // Extract the differing word arrays
+    const originalWordArray = rawWords.slice(rawStart, rawEnd);
+    const correctedWordArray = finalWords.slice(finalStart, finalEnd);
 
-    // Only record if there's an actual change (not just deletion or insertion)
-    // We want phrase replacements, not pure additions or removals
-    if (originalPhrase && correctedPhrase && originalPhrase !== correctedPhrase) {
-      // Skip very short changes that might be typos (single character differences)
+    // Skip if either side is empty (pure insertion or deletion)
+    if (originalWordArray.length === 0 || correctedWordArray.length === 0) {
+      continue;
+    }
+
+    // Check if word counts are equal - if so, decompose into word pairs
+    if (originalWordArray.length === correctedWordArray.length) {
+      // Decompose into word-level corrections
+      const wordCorrections = decomposePhraseToWords(originalWordArray, correctedWordArray);
+      corrections.push(...wordCorrections);
+    } else {
+      // Unequal word counts - keep as phrase correction
+      const originalPhrase = originalWordArray.join(' ');
+      const correctedPhrase = correctedWordArray.join(' ');
+
       const normalizedOriginal = normalize(originalPhrase);
       const normalizedCorrected = normalize(correctedPhrase);
 

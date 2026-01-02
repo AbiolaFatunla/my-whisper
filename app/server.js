@@ -479,6 +479,99 @@ app.delete('/api/transcripts/:id', async (req, res) => {
 });
 
 /**
+ * Escape HTML special characters
+ */
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Share page endpoint - returns HTML with dynamic OG tags for social media previews
+ */
+app.get('/api/share-page/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).send('<html><body><h1>Error</h1><p>Recording ID is required</p></body></html>');
+    }
+
+    const transcript = await database.getTranscript(id);
+
+    if (!transcript) {
+      return res.status(404).send('<html><body><h1>Not Found</h1><p>This recording no longer exists.</p></body></html>');
+    }
+
+    // Use best available text: final > personalized > raw
+    const text = transcript.final_text || transcript.personalized_text || transcript.raw_text || '';
+    const title = transcript.title || 'Voice Recording';
+    const description = text.substring(0, 150) + (text.length > 150 ? '...' : '');
+
+    // Build the HTML page with dynamic OG tags
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(title)} - My Whisper</title>
+
+    <!-- Dynamic Open Graph tags for social media previews -->
+    <meta property="og:title" content="${escapeHtml(title)}">
+    <meta property="og:description" content="${escapeHtml(description)}">
+    <meta property="og:type" content="audio">
+    <meta property="og:site_name" content="My Whisper">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="${escapeHtml(title)}">
+    <meta name="twitter:description" content="${escapeHtml(description)}">
+
+    <meta name="description" content="${escapeHtml(description)}">
+
+    <!-- Redirect to the full share page -->
+    <script>
+        window.location.href = '/share.html?id=${escapeHtml(id)}';
+    </script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+        }
+        .loading { text-align: center; }
+        a { color: white; }
+    </style>
+</head>
+<body>
+    <div class="loading">
+        <h1>${escapeHtml(title)}</h1>
+        <p>Loading recording...</p>
+        <p><a href="/share.html?id=${escapeHtml(id)}">Click here if not redirected</a></p>
+    </div>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    console.error('Error fetching share page:', error);
+    res.status(404).send('<html><body><h1>Not Found</h1><p>This recording no longer exists.</p></body></html>');
+  }
+});
+
+/**
  * Public share endpoint - returns transcript data for shared links
  * No auth required, read-only access to specific fields only
  */
@@ -496,11 +589,14 @@ app.get('/api/share/:id', async (req, res) => {
       return res.status(404).json({ error: 'Recording not found' });
     }
 
+    // Use best available text: final > personalized > raw
+    const text = transcript.final_text || transcript.personalized_text || transcript.raw_text;
+
     // Return only public fields
     res.json({
       id: transcript.id,
       title: transcript.title,
-      text: transcript.raw_text,
+      text: text,
       audioUrl: transcript.audio_url,
       createdAt: transcript.created_at
     });

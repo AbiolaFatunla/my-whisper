@@ -890,8 +890,22 @@ async function copyHistoryTranscript(id) {
 }
 
 /**
+ * Convert title to URL-safe slug
+ */
+function slugify(text) {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')  // Remove non-word chars except spaces and hyphens
+    .replace(/\s+/g, '-')       // Replace spaces with hyphens
+    .replace(/-+/g, '-')        // Replace multiple hyphens with single
+    .substring(0, 50);          // Limit length
+}
+
+/**
  * Share recording - copy shareable link to clipboard
- * Uses transcript ID for clean URLs - share page fetches data from API
+ * Uses API endpoint for dynamic OG tags (WhatsApp/social media previews)
  */
 async function shareRecording(id) {
   const transcript = transcripts.find(t => t.id === id);
@@ -900,9 +914,9 @@ async function shareRecording(id) {
     return;
   }
 
-  // Build clean shareable URL with just the transcript ID
-  const shareUrl = new URL(window.location.origin + '/share.html');
-  shareUrl.searchParams.set('id', id);
+  // Use API share-page endpoint for dynamic OG tags
+  // This allows WhatsApp etc. to show the actual recording title
+  const shareUrl = `${config.apiUrl}/share-page/${id}`;
 
   try {
     // Try Web Share API first (mobile-friendly)

@@ -804,7 +804,7 @@ async function handlePublicShare(id) {
   // Security: Only expose limited fields, not the full transcript record
   const { data, error } = await supabase
     .from('transcripts')
-    .select('id, title, raw_text, audio_url, created_at')
+    .select('id, title, raw_text, final_text, personalized_text, audio_url, created_at')
     .eq('id', id)
     .single();
 
@@ -812,13 +812,135 @@ async function handlePublicShare(id) {
     return errorResponse(404, 'Recording not found');
   }
 
+  // Use best available text: final > personalized > raw
+  const text = data.final_text || data.personalized_text || data.raw_text;
+
   return jsonResponse(200, {
     id: data.id,
     title: data.title,
-    text: data.raw_text,
+    text: text,
     audioUrl: data.audio_url,
     createdAt: data.created_at
   });
+}
+
+/**
+ * Escape HTML special characters
+ */
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Share page endpoint - returns HTML with dynamic OG tags for social media previews
+ * This allows WhatsApp, Twitter, etc. to show the actual recording title
+ */
+async function handleSharePage(id) {
+  if (!supabase) {
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'text/html' },
+      body: '<html><body><h1>Error</h1><p>Database not configured</p></body></html>'
+    };
+  }
+
+  if (!id) {
+    return {
+      statusCode: 400,
+      headers: { 'Content-Type': 'text/html' },
+      body: '<html><body><h1>Error</h1><p>Recording ID is required</p></body></html>'
+    };
+  }
+
+  // Fetch transcript
+  const { data, error } = await supabase
+    .from('transcripts')
+    .select('id, title, raw_text, final_text, personalized_text, audio_url, created_at')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) {
+    return {
+      statusCode: 404,
+      headers: { 'Content-Type': 'text/html' },
+      body: '<html><body><h1>Not Found</h1><p>This recording no longer exists.</p></body></html>'
+    };
+  }
+
+  // Use best available text: final > personalized > raw
+  const text = data.final_text || data.personalized_text || data.raw_text || '';
+  const title = data.title || 'Voice Recording';
+  const description = text.substring(0, 150) + (text.length > 150 ? '...' : '');
+
+  // Build the HTML page with dynamic OG tags
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(title)} - My Whisper</title>
+
+    <!-- Dynamic Open Graph tags for social media previews -->
+    <meta property="og:title" content="${escapeHtml(title)}">
+    <meta property="og:description" content="${escapeHtml(description)}">
+    <meta property="og:type" content="audio">
+    <meta property="og:site_name" content="My Whisper">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="${escapeHtml(title)}">
+    <meta name="twitter:description" content="${escapeHtml(description)}">
+
+    <meta name="description" content="${escapeHtml(description)}">
+
+    <!-- Redirect to the full share page on Vercel -->
+    <script>
+        // Pass the transcript ID to the Vercel-hosted share page
+        window.location.href = 'https://my-whisper.vercel.app/share.html?id=${escapeHtml(id)}';
+    </script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+        }
+        .loading {
+            text-align: center;
+        }
+        a {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">
+        <h1>${escapeHtml(title)}</h1>
+        <p>Loading recording...</p>
+        <p><a href="https://my-whisper.vercel.app/share.html?id=${escapeHtml(id)}">Click here if not redirected</a></p>
+    </div>
+</body>
+</html>`;
+
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'text/html',
+      'Access-Control-Allow-Origin': '*'
+    },
+    body: html
+  };
 }
 
 async function handleAudioProxy(queryParams) {
@@ -921,7 +1043,13 @@ exports.handler = async (event) => {
       return await handleAudioProxy(queryParams);
     }
 
-    // Match /share/:id (public endpoint for shared links)
+    // Match /share-page/:id (HTML page with OG tags for social media previews)
+    const sharePageMatch = path.match(/^\/share-page\/([^\/]+)$/);
+    if (sharePageMatch && method === 'GET') {
+      return await handleSharePage(sharePageMatch[1]);
+    }
+
+    // Match /share/:id (JSON endpoint for shared links data)
     const shareMatch = path.match(/^\/share\/([^\/]+)$/);
     if (shareMatch && method === 'GET') {
       return await handlePublicShare(shareMatch[1]);

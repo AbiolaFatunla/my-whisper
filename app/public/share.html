@@ -267,9 +267,16 @@
 
         const content = document.getElementById('content');
 
-        // Get transcript ID from URL
+        // Get transcript ID and optional title from URL
         const params = new URLSearchParams(window.location.search);
         const transcriptId = params.get('id');
+        const urlTitle = params.get('title');
+
+        // If title is in URL, show it immediately (before API loads)
+        if (urlTitle) {
+            const formattedTitle = urlTitle.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            document.title = formattedTitle + ' - My Whisper';
+        }
 
         // Store transcript text for copy button
         let transcriptText = '';

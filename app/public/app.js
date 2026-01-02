@@ -88,7 +88,10 @@ async function initAuth() {
       console.log('Auth state changed:', event);
       updateAuthUI();
 
-      // Reload history when user signs in/out to show their recordings
+      // Reload history when auth state changes
+      // SIGNED_IN: user just signed in
+      // SIGNED_OUT: user signed out
+      // Note: INITIAL_SESSION is handled by bootstrap() awaiting init() before loadHistory()
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
         loadHistory();
       }
@@ -1101,14 +1104,14 @@ function escapeHtml(text) {
 }
 
 // Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    init();
-    setupHistoryEventListeners();
-    loadHistory();
-  });
-} else {
-  init();
+async function bootstrap() {
+  await init();
   setupHistoryEventListeners();
-  loadHistory();
+  await loadHistory();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrap);
+} else {
+  bootstrap();
 }

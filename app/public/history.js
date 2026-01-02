@@ -64,7 +64,10 @@ async function initAuth() {
       console.log('Auth state changed:', event);
       updateAuthUI();
 
-      // Reload transcripts when user signs in/out to show their recordings
+      // Reload transcripts when auth state changes
+      // SIGNED_IN: user just signed in
+      // SIGNED_OUT: user signed out
+      // Note: INITIAL_SESSION is handled by init() awaiting initAuth() before loadTranscripts()
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
         loadTranscripts();
       }

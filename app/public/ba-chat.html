@@ -12,6 +12,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <style>
+        /* BA Chat - Define missing CSS variables */
+        :root {
+            --primary: #f97316;
+            --gradient-primary: linear-gradient(135deg, #f97316 0%, #ec4899 50%, #fbbf24 100%);
+        }
+
         /* BA Chat styles */
         body {
             background: var(--bg-primary);
@@ -37,6 +43,7 @@
             background: var(--glass-bg);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--glass-border);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         }
 
         .ba-header-left {
@@ -56,11 +63,13 @@
             color: var(--text-secondary);
             cursor: pointer;
             border-radius: 8px;
-            transition: background 0.2s;
+            transition: all 0.2s;
         }
 
         .ba-back-btn:hover {
             background: var(--bg-secondary);
+            color: var(--primary);
+            transform: translateX(-2px);
         }
 
         .ba-header-title {
@@ -83,6 +92,7 @@
             background: var(--bg-secondary);
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
+            border-bottom: 1px solid var(--glass-border);
         }
 
         .ba-progress::-webkit-scrollbar {
@@ -101,17 +111,25 @@
             color: var(--text-tertiary);
             white-space: nowrap;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.25s;
+        }
+
+        .ba-progress-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
         .ba-progress-item.covered {
             background: rgba(249, 115, 22, 0.1);
             border-color: var(--primary);
             color: var(--primary);
+            box-shadow: 0 2px 8px rgba(249, 115, 22, 0.15);
         }
 
         .ba-progress-item.covered:hover {
-            background: rgba(249, 115, 22, 0.15);
+            background: rgba(249, 115, 22, 0.18);
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.25);
+            transform: translateY(-2px);
         }
 
         .ba-progress-dot {
@@ -119,10 +137,12 @@
             height: 8px;
             border-radius: 50%;
             background: var(--text-tertiary);
+            transition: all 0.3s;
         }
 
         .ba-progress-item.covered .ba-progress-dot {
             background: var(--primary);
+            box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
         }
 
         /* Chat messages */
@@ -141,19 +161,27 @@
             border-radius: 16px;
             line-height: 1.5;
             font-size: 0.95rem;
+            animation: messageSlideIn 0.3s ease-out;
+        }
+
+        @keyframes messageSlideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .ba-message.assistant {
             align-self: flex-start;
-            background: var(--glass-bg);
+            background: var(--bg-secondary);
             border: 1px solid var(--glass-border);
             color: var(--text-primary);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
         }
 
         .ba-message.user {
             align-self: flex-end;
             background: var(--gradient-primary);
             color: white;
+            box-shadow: 0 4px 20px rgba(249, 115, 22, 0.3);
         }
 
         .ba-message-time {
@@ -211,12 +239,32 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3);
+            position: relative;
+        }
+
+        .ba-record-btn::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.3), rgba(236, 72, 153, 0.3)) border-box;
+            mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
 
         .ba-record-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 20px rgba(249, 115, 22, 0.4);
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 12px 32px rgba(249, 115, 22, 0.5), 0 0 40px rgba(249, 115, 22, 0.2);
+        }
+
+        .ba-record-btn:hover::before {
+            opacity: 1;
         }
 
         .ba-record-btn.recording {
@@ -274,6 +322,7 @@
             padding: 12px;
             background: var(--bg-secondary);
             border-radius: 12px;
+            border: 1px solid var(--glass-border);
         }
 
         .ba-review-audio button {
@@ -281,18 +330,39 @@
             height: 40px;
             border-radius: 50%;
             border: none;
-            background: var(--primary);
+            background: var(--gradient-primary);
             color: white;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+        }
+
+        .ba-review-audio button:hover {
+            transform: scale(1.08);
+            box-shadow: 0 6px 18px rgba(249, 115, 22, 0.35);
         }
 
         .ba-review-duration {
             font-size: 0.9rem;
             color: var(--text-secondary);
             font-variant-numeric: tabular-nums;
+        }
+
+        .ba-review-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            padding: 0 2px;
+        }
+
+        .ba-review-label svg {
+            flex-shrink: 0;
+            color: var(--primary);
         }
 
         .ba-review-textarea {
@@ -308,11 +378,13 @@
             background: var(--bg-secondary);
             color: var(--text-primary);
             resize: vertical;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         .ba-review-textarea:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
         }
 
         .ba-review-actions {
@@ -345,11 +417,12 @@
             background: var(--gradient-primary);
             border: none;
             color: white;
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.25);
         }
 
         .ba-review-btn.send:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4), 0 0 30px rgba(249, 115, 22, 0.15);
         }
 
         .ba-review-btn:disabled {
@@ -406,11 +479,13 @@
             background: var(--bg-secondary);
             color: var(--text-primary);
             resize: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         .ba-text-input textarea:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
         }
 
         .ba-text-send-btn {
@@ -425,6 +500,13 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+        }
+
+        .ba-text-send-btn:hover:not(:disabled) {
+            transform: scale(1.08);
+            box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
         }
 
         .ba-text-send-btn:disabled {
@@ -497,12 +579,18 @@
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(8px);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 1000;
             padding: 20px;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         .ba-modal-overlay.visible {
@@ -510,14 +598,21 @@
         }
 
         .ba-modal {
-            background: var(--bg-primary);
-            border-radius: 16px;
+            background: var(--bg-secondary);
+            border-radius: 20px;
             width: 100%;
             max-width: 500px;
             max-height: 80vh;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.35), 0 0 60px rgba(249, 115, 22, 0.1);
+            border: 1px solid var(--glass-border);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
         .ba-modal-wide {
@@ -551,11 +646,13 @@
             color: var(--text-secondary);
             cursor: pointer;
             border-radius: 8px;
-            transition: background 0.2s;
+            transition: all 0.2s;
         }
 
         .ba-modal-close:hover {
-            background: var(--bg-secondary);
+            background: rgba(249, 115, 22, 0.1);
+            color: var(--primary);
+            transform: rotate(90deg);
         }
 
         .ba-modal-body {
@@ -621,11 +718,12 @@
             background: var(--gradient-primary);
             border: none;
             color: white;
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.25);
         }
 
         .ba-modal-btn.primary:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4), 0 0 30px rgba(249, 115, 22, 0.15);
         }
 
         .ba-modal-btn:disabled {
@@ -723,15 +821,22 @@
             color: white;
             cursor: pointer;
             transition: all 0.2s;
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.25);
         }
 
         .ba-generate-btn.visible {
             display: block;
+            animation: fadeInPulse 0.3s ease-out;
+        }
+
+        @keyframes fadeInPulse {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
         .ba-generate-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4), 0 0 30px rgba(249, 115, 22, 0.15);
         }
 
         @media (max-width: 767px) {
@@ -806,17 +911,20 @@
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
-            transition: all 0.2s;
+            transition: all 0.25s;
         }
 
         .ba-output-tab:hover {
-            border-color: var(--text-tertiary);
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-1px);
         }
 
         .ba-output-tab.active {
             background: var(--gradient-primary);
             border-color: transparent;
             color: white;
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
         }
 
         .ba-output-content {
@@ -898,11 +1006,12 @@
             color: white;
             cursor: pointer;
             transition: all 0.2s;
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.25);
         }
 
         .ba-output-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4), 0 0 30px rgba(249, 115, 22, 0.15);
         }
 
         .ba-output-btn.secondary {
@@ -1068,6 +1177,13 @@
                     </button>
                     <span class="ba-review-duration" id="reviewDuration">00:00</span>
                 </div>
+                <label class="ba-review-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                        <path d="m15 5 4 4"/>
+                    </svg>
+                    Review & edit - ensure this is accurate before sending
+                </label>
                 <textarea class="ba-review-textarea" id="reviewTextarea" placeholder="Edit your message..."></textarea>
                 <div class="ba-review-actions">
                     <button class="ba-review-btn discard" id="discardBtn">Discard</button>

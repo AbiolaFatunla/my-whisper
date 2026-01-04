@@ -162,6 +162,12 @@ class AudioRecorder {
     const height = canvas.height;
 
     const draw = () => {
+      // Check if analyser still exists before continuing animation
+      if (!this.analyser || !this.dataArray) {
+        this.animationId = null;
+        return;
+      }
+
       this.animationId = requestAnimationFrame(draw);
 
       this.analyser.getByteFrequencyData(this.dataArray);

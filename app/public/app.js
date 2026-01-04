@@ -17,6 +17,10 @@ const userInfo = document.getElementById('userInfo');
 const userAvatar = document.getElementById('userAvatar');
 const userName = document.getElementById('userName');
 const userEmail = document.getElementById('userEmail');
+const adminBtn = document.getElementById('adminBtn');
+
+// Admin email
+const ADMIN_EMAIL = 'ftnlabiola@gmail.com';
 
 // DOM Elements
 const recordButton = document.getElementById('recordButton');
@@ -127,10 +131,15 @@ function updateAuthUI() {
     if (userInfo) {
       userInfo.classList.remove('show-email');
     }
+    // Show admin button for admin email only
+    if (adminBtn) {
+      adminBtn.style.display = user.email === ADMIN_EMAIL ? 'flex' : 'none';
+    }
   } else {
     // User is not signed in (anonymous mode)
     if (signInBtn) signInBtn.style.display = 'flex';
     if (userMenu) userMenu.style.display = 'none';
+    if (adminBtn) adminBtn.style.display = 'none';
   }
 }
 

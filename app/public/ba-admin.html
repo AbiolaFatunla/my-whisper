@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="BA Admin Dashboard - Manage access codes and sessions">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>BA Admin Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #f97316;
+            --gradient-primary: linear-gradient(135deg, #f97316 0%, #ec4899 50%, #fbbf24 100%);
+        }
+
+        body {
+            background: var(--bg-primary);
+        }
+
+        .ba-admin-container {
+            min-height: 100vh;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .ba-admin-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--glass-border);
+            margin-bottom: 24px;
+        }
+
+        .ba-admin-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .ba-back-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .ba-back-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--primary);
+            transform: translateX(-2px);
+        }
+
+        .ba-admin-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .ba-admin-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ba-admin-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+        }
+
+        .ba-admin-email {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Tabs */
+        .ba-admin-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+        }
+
+        .ba-admin-tab {
+            padding: 10px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-full);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ba-admin-tab:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .ba-admin-tab.active {
+            background: var(--gradient-primary);
+            border-color: transparent;
+            color: white;
+        }
+
+        /* Content Panels */
+        .ba-admin-panel {
+            display: none;
+        }
+
+        .ba-admin-panel.active {
+            display: block;
+        }
+
+        /* Section Header */
+        .ba-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .ba-section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Cards */
+        .ba-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+        }
+
+        .ba-card:hover {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        /* Session Card */
+        .ba-session-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .ba-session-info {
+            flex: 1;
+        }
+
+        .ba-session-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .ba-session-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .ba-session-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .ba-session-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: var(--radius-full);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .ba-session-status.complete {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+
+        .ba-session-status.in_progress {
+            background: rgba(249, 115, 22, 0.15);
+            color: #f97316;
+        }
+
+        .ba-session-status.started {
+            background: rgba(148, 163, 184, 0.15);
+            color: #94a3b8;
+        }
+
+        .ba-session-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .ba-session-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Access Code Card */
+        .ba-code-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .ba-code-info {
+            flex: 1;
+        }
+
+        .ba-code-value {
+            font-family: monospace;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--primary);
+            background: rgba(249, 115, 22, 0.1);
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-bottom: 6px;
+        }
+
+        .ba-code-client {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .ba-code-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .ba-code-status {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: var(--radius-full);
+        }
+
+        .ba-code-status.active {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+
+        .ba-code-status.expired {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        /* Buttons */
+        .ba-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ba-btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+
+        .ba-btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(249, 115, 22, 0.4);
+        }
+
+        .ba-btn-secondary {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .ba-btn-secondary:hover {
+            background: var(--bg-secondary);
+        }
+
+        .ba-btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .ba-btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .ba-btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Create Code Form */
+        .ba-create-form {
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .ba-create-form.active {
+            display: block;
+        }
+
+        .ba-form-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .ba-form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .ba-form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .ba-form-label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .ba-form-input {
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .ba-form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+        }
+
+        .ba-form-hint {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .ba-form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        /* Empty State */
+        .ba-empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .ba-empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .ba-empty-state p {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .ba-empty-state small {
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+
+        /* Loading State */
+        .ba-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            gap: 12px;
+            color: var(--text-secondary);
+        }
+
+        .ba-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Session Detail Modal */
+        .ba-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .ba-modal.active {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+        }
+
+        .ba-modal-content {
+            background: var(--bg-card);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 900px;
+            margin: 40px 0;
+            overflow: hidden;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .ba-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .ba-modal-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .ba-modal-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .ba-modal-close:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .ba-modal-body {
+            padding: 24px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        /* Session Detail - Two Column Layout */
+        .ba-detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .ba-detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ba-form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .ba-detail-section {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .ba-detail-section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Conversation Messages in Detail */
+        .ba-detail-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .ba-detail-message {
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .ba-detail-message.assistant {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            align-self: flex-start;
+            max-width: 90%;
+        }
+
+        .ba-detail-message.user {
+            background: var(--gradient-primary);
+            color: white;
+            align-self: flex-end;
+            max-width: 90%;
+        }
+
+        .ba-detail-message-audio {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .ba-detail-message-audio audio {
+            width: 100%;
+            height: 32px;
+        }
+
+        /* Generated Docs in Detail */
+        .ba-detail-docs {
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .ba-detail-docs h1,
+        .ba-detail-docs h2,
+        .ba-detail-docs h3 {
+            color: var(--text-primary);
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+
+        .ba-detail-docs h1 { font-size: 1.3rem; }
+        .ba-detail-docs h2 { font-size: 1.1rem; }
+        .ba-detail-docs h3 { font-size: 1rem; }
+
+        .ba-detail-docs p {
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .ba-detail-docs ul,
+        .ba-detail-docs ol {
+            margin-bottom: 12px;
+            padding-left: 20px;
+        }
+
+        .ba-detail-docs li {
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        /* Auth Required State */
+        .ba-auth-required {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .ba-auth-required svg {
+            width: 80px;
+            height: 80px;
+            color: var(--primary);
+            margin-bottom: 24px;
+        }
+
+        .ba-auth-required h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .ba-auth-required p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            max-width: 400px;
+        }
+
+        /* Toast */
+        .ba-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            padding: 12px 24px;
+            border-radius: var(--radius-full);
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
+            z-index: 2000;
+        }
+
+        .ba-toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 640px) {
+            .ba-admin-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .ba-admin-tabs {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .ba-session-card {
+                flex-direction: column;
+            }
+
+            .ba-session-actions {
+                width: 100%;
+            }
+
+            .ba-session-actions .ba-btn {
+                flex: 1;
+                justify-content: center;
+            }
+
+            .ba-code-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <div class="ba-admin-container">
+        <!-- Header -->
+        <header class="ba-admin-header">
+            <div class="ba-admin-header-left">
+                <a href="index.html" class="ba-back-btn" aria-label="Back to app">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <h1 class="ba-admin-title">BA Admin Dashboard</h1>
+            </div>
+            <div class="ba-admin-user" id="adminUser" style="display: none;">
+                <img class="ba-admin-avatar" id="adminAvatar" src="" alt="Admin">
+                <span class="ba-admin-email" id="adminEmail"></span>
+            </div>
+        </header>
+
+        <!-- Auth Required State -->
+        <div class="ba-auth-required" id="authRequired">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+            </svg>
+            <h2>Admin Access Required</h2>
+            <p>Sign in with your admin Google account to access the BA dashboard.</p>
+            <button class="ba-btn ba-btn-primary" id="signInBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Sign in with Google
+            </button>
+        </div>
+
+        <!-- Main Content (hidden until auth) -->
+        <div id="mainContent" style="display: none;">
+            <!-- Tabs -->
+            <div class="ba-admin-tabs">
+                <button class="ba-admin-tab active" data-tab="sessions">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Sessions
+                </button>
+                <button class="ba-admin-tab" data-tab="codes">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    Access Codes
+                </button>
+            </div>
+
+            <!-- Sessions Panel -->
+            <div class="ba-admin-panel active" id="sessionsPanel">
+                <div class="ba-section-header">
+                    <h2 class="ba-section-title">All Sessions</h2>
+                    <button class="ba-btn ba-btn-secondary ba-btn-sm" id="refreshSessionsBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <div class="ba-loading" id="sessionsLoading">
+                    <div class="ba-spinner"></div>
+                    <span>Loading sessions...</span>
+                </div>
+
+                <div id="sessionsList"></div>
+
+                <div class="ba-empty-state" id="sessionsEmpty" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <p>No sessions yet</p>
+                    <small>Sessions will appear here when clients start using their access codes</small>
+                </div>
+            </div>
+
+            <!-- Access Codes Panel -->
+            <div class="ba-admin-panel" id="codesPanel">
+                <div class="ba-section-header">
+                    <h2 class="ba-section-title">Access Codes</h2>
+                    <button class="ba-btn ba-btn-primary" id="newCodeBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        New Code
+                    </button>
+                </div>
+
+                <!-- Create Code Form -->
+                <div class="ba-create-form" id="createCodeForm">
+                    <h3 class="ba-form-title">Create New Access Code</h3>
+                    <div class="ba-form-row">
+                        <div class="ba-form-group">
+                            <label class="ba-form-label">Access Code</label>
+                            <input type="text" class="ba-form-input" id="codeInput" placeholder="acme-2026" pattern="[a-z0-9-]+" required>
+                            <span class="ba-form-hint">Lowercase letters, numbers, and hyphens only</span>
+                        </div>
+                        <div class="ba-form-group">
+                            <label class="ba-form-label">Client Name</label>
+                            <input type="text" class="ba-form-input" id="clientNameInput" placeholder="Acme Corporation" required>
+                        </div>
+                    </div>
+                    <div class="ba-form-actions">
+                        <button class="ba-btn ba-btn-secondary" id="cancelCodeBtn">Cancel</button>
+                        <button class="ba-btn ba-btn-primary" id="saveCodeBtn">Create Code</button>
+                    </div>
+                </div>
+
+                <div class="ba-loading" id="codesLoading">
+                    <div class="ba-spinner"></div>
+                    <span>Loading access codes...</span>
+                </div>
+
+                <div id="codesList"></div>
+
+                <div class="ba-empty-state" id="codesEmpty" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <p>No access codes yet</p>
+                    <small>Create an access code to invite a client</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Detail Modal -->
+    <div class="ba-modal" id="sessionModal">
+        <div class="ba-modal-content">
+            <div class="ba-modal-header">
+                <h2 class="ba-modal-title" id="modalSessionTitle">Session Details</h2>
+                <button class="ba-modal-close" id="closeSessionModal">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="ba-modal-body">
+                <div class="ba-detail-grid">
+                    <div class="ba-detail-section">
+                        <h3 class="ba-detail-section-title">Conversation</h3>
+                        <div class="ba-detail-messages" id="modalConversation">
+                            <!-- Messages populated by JS -->
+                        </div>
+                    </div>
+                    <div class="ba-detail-section">
+                        <h3 class="ba-detail-section-title">Generated Documentation</h3>
+                        <div class="ba-detail-docs" id="modalDocs">
+                            <!-- Docs populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="ba-toast" id="toast"></div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="supabase-client.js"></script>
+    <script src="ba-admin.js"></script>
+</body>
+</html>

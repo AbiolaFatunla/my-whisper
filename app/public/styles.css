@@ -355,6 +355,44 @@ body::before {
   font-size: 0.8rem;
 }
 
+/* Admin Button */
+.admin-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--gradient-primary, linear-gradient(135deg, #f97316 0%, #ec4899 50%, #fbbf24 100%));
+  border: none;
+  border-radius: var(--radius-full);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+}
+
+.admin-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4);
+}
+
+.admin-btn svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .admin-btn span {
+    display: none;
+  }
+
+  .admin-btn {
+    padding: 8px 12px;
+  }
+}
+
 .user-menu {
   display: flex;
   align-items: center;

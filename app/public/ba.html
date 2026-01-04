@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="AI Business Analyst - Document your project requirements through voice">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>AI Business Analyst</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* BA-specific styles */
+        .ba-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .ba-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 48px 40px;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .ba-logo {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 24px;
+        }
+
+        .ba-logo .logo-arc,
+        .ba-logo .logo-a-shape {
+            fill: #7c2d12;
+            stroke: #ffffff;
+            stroke-width: 20.83px;
+        }
+
+        [data-theme="dark"] .ba-logo .logo-arc,
+        [data-theme="dark"] .ba-logo .logo-a-shape {
+            fill: #fed7aa;
+            stroke: #451a03;
+        }
+
+        .ba-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .ba-subtitle {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+
+        .ba-input-group {
+            margin-bottom: 24px;
+        }
+
+        .ba-input {
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 1rem;
+            font-family: inherit;
+            border: 2px solid var(--glass-border);
+            border-radius: 12px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            text-align: center;
+            letter-spacing: 0.5px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .ba-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+        }
+
+        .ba-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .ba-button {
+            width: 100%;
+            padding: 16px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            border: none;
+            border-radius: 12px;
+            background: var(--gradient-primary);
+            color: white;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .ba-button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+
+        .ba-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .ba-error {
+            color: var(--error);
+            font-size: 0.875rem;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .ba-error.visible {
+            display: block;
+        }
+
+        /* Welcome screen */
+        .ba-welcome {
+            display: none;
+        }
+
+        .ba-welcome.visible {
+            display: block;
+        }
+
+        .ba-gate {
+            display: block;
+        }
+
+        .ba-gate.hidden {
+            display: none;
+        }
+
+        .ba-welcome-text {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+
+        .ba-welcome-text p {
+            margin: 0 0 12px 0;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .ba-welcome-text p:last-child {
+            margin-bottom: 0;
+        }
+
+        .ba-client-name {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .ba-resume-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .ba-resume-label {
+            font-size: 0.875rem;
+            color: var(--text-tertiary);
+            margin-bottom: 12px;
+        }
+
+        .ba-resume-button {
+            width: 100%;
+            padding: 14px 20px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            font-family: inherit;
+            border: 2px solid var(--glass-border);
+            border-radius: 12px;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .ba-resume-button:hover {
+            border-color: var(--primary);
+            background: rgba(249, 115, 22, 0.05);
+        }
+
+        .ba-project-name {
+            font-weight: 600;
+        }
+
+        /* Theme toggle in corner */
+        .ba-theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <div class="ba-theme-toggle">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+            <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+        </button>
+    </div>
+
+    <div class="ba-container">
+        <div class="ba-card">
+            <!-- Access Gate -->
+            <div class="ba-gate" id="baGate">
+                <svg class="ba-logo" viewBox="0 0 1140 1084" xmlns="http://www.w3.org/2000/svg">
+                    <path class="logo-arc" d="M778.209,800.636c-51.535,59.252 -127.466,96.733 -212.082,96.733c-82.396,0 -156.556,-35.54 -207.975,-92.114l32.115,-55.625c40.315,53.099 104.111,87.414 175.859,87.414c74.045,0 139.62,-36.547 179.658,-92.57l32.424,56.161Z"/>
+                    <path class="logo-a-shape" d="M569.517,439.166l-311.837,540.11l-152.994,-88.332l448.51,-776.833l16.324,-9.425l16.337,9.432l448.494,776.825l-153.004,88.336l-311.83,-540.113Z"/>
+                </svg>
+                <h1 class="ba-title">AI Business Analyst</h1>
+                <p class="ba-subtitle">Enter your access code to start documenting your project requirements.</p>
+
+                <div class="ba-input-group">
+                    <input
+                        type="text"
+                        class="ba-input"
+                        id="accessCodeInput"
+                        placeholder="Enter access code"
+                        autocomplete="off"
+                        autocapitalize="none"
+                        spellcheck="false"
+                    >
+                    <p class="ba-error" id="errorMessage"></p>
+                </div>
+
+                <button class="ba-button" id="continueBtn">Continue</button>
+            </div>
+
+            <!-- Welcome Screen (shown after valid code) -->
+            <div class="ba-welcome" id="baWelcome">
+                <svg class="ba-logo" viewBox="0 0 1140 1084" xmlns="http://www.w3.org/2000/svg">
+                    <path class="logo-arc" d="M778.209,800.636c-51.535,59.252 -127.466,96.733 -212.082,96.733c-82.396,0 -156.556,-35.54 -207.975,-92.114l32.115,-55.625c40.315,53.099 104.111,87.414 175.859,87.414c74.045,0 139.62,-36.547 179.658,-92.57l32.424,56.161Z"/>
+                    <path class="logo-a-shape" d="M569.517,439.166l-311.837,540.11l-152.994,-88.332l448.51,-776.833l16.324,-9.425l16.337,9.432l448.494,776.825l-153.004,88.336l-311.83,-540.113Z"/>
+                </svg>
+                <h1 class="ba-title">Welcome, <span class="ba-client-name" id="clientName"></span></h1>
+                <p class="ba-subtitle">Let's document your project requirements.</p>
+
+                <div class="ba-welcome-text">
+                    <p>Describe your project and I'll ask clarifying questions. At the end, you'll have proper documentation ready for development.</p>
+                    <p>Speak naturally, like you're explaining to a colleague. I'll structure it for you.</p>
+                </div>
+
+                <button class="ba-button" id="startBtn">Start New Session</button>
+
+                <div class="ba-resume-section" id="resumeSection" style="display: none;">
+                    <p class="ba-resume-label">or continue previous session</p>
+                    <button class="ba-resume-button" id="resumeBtn">
+                        Resume: <span class="ba-project-name" id="projectName">Untitled Project</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="ba.js"></script>
+</body>
+</html>

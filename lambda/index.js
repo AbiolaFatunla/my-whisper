@@ -982,6 +982,733 @@ async function handleAudioProxy(queryParams) {
   }
 }
 
+// ============================================
+// BA (Business Analyst) Feature Handlers
+// ============================================
+
+/**
+ * Check if user is an admin (authenticated via Google OAuth)
+ * For now, any authenticated user is considered admin
+ * In production, you could check against a list of admin user IDs
+ */
+function isAdminUser(headers) {
+  const normalizedHeaders = {};
+  for (const [key, value] of Object.entries(headers || {})) {
+    normalizedHeaders[key.toLowerCase()] = value;
+  }
+
+  const authHeader = normalizedHeaders['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.substring(7);
+      const payloadBase64 = token.split('.')[1];
+      const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
+      // Check if it's a real authenticated user (not anonymous)
+      // Supabase JWT contains email for OAuth users
+      if (payload.sub && payload.email) {
+        console.log('Admin user verified:', payload.email);
+        return { isAdmin: true, userId: payload.sub, email: payload.email };
+      }
+    } catch (e) {
+      console.error('Failed to verify admin:', e.message);
+    }
+  }
+  return { isAdmin: false };
+}
+
+/**
+ * Validate BA access code
+ * POST /ba/validate-code
+ */
+async function handleBAValidateCode(body) {
+  const { code } = body;
+
+  if (!code) {
+    return errorResponse(400, 'Access code is required');
+  }
+
+  const { data, error } = await supabase
+    .from('ba_access_codes')
+    .select('code, client_name, is_active, expires_at')
+    .eq('code', code)
+    .single();
+
+  if (error || !data) {
+    return jsonResponse(200, { valid: false, message: 'Invalid access code' });
+  }
+
+  if (!data.is_active) {
+    return jsonResponse(200, { valid: false, message: 'This access code has been deactivated' });
+  }
+
+  if (data.expires_at && new Date(data.expires_at) < new Date()) {
+    return jsonResponse(200, { valid: false, message: 'This access code has expired' });
+  }
+
+  // Check if there's an existing session for this code
+  const { data: existingSession } = await supabase
+    .from('ba_sessions')
+    .select('id, project_name, status, updated_at')
+    .eq('access_code', code)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  return jsonResponse(200, {
+    valid: true,
+    clientName: data.client_name,
+    existingSession: existingSession || null
+  });
+}
+
+/**
+ * Get BA session for an access code
+ * GET /ba/session?code=xxx
+ */
+async function handleBAGetSession(queryParams) {
+  const code = queryParams?.code;
+
+  if (!code) {
+    return errorResponse(400, 'Access code is required');
+  }
+
+  const { data, error } = await supabase
+    .from('ba_sessions')
+    .select('*')
+    .eq('access_code', code)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    return jsonResponse(200, { session: null });
+  }
+
+  return jsonResponse(200, { session: data });
+}
+
+/**
+ * Create or update BA session
+ * PUT /ba/session
+ */
+async function handleBAUpdateSession(body) {
+  const { accessCode, sessionId, projectName, conversationHistory, coverageStatus, status } = body;
+
+  if (!accessCode) {
+    return errorResponse(400, 'Access code is required');
+  }
+
+  if (sessionId) {
+    // Update existing session
+    const updateData = { updated_at: new Date().toISOString() };
+    if (projectName !== undefined) updateData.project_name = projectName;
+    if (conversationHistory !== undefined) updateData.conversation_history = conversationHistory;
+    if (coverageStatus !== undefined) updateData.coverage_status = coverageStatus;
+    if (status !== undefined) updateData.status = status;
+
+    const { data, error } = await supabase
+      .from('ba_sessions')
+      .update(updateData)
+      .eq('id', sessionId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating BA session:', error);
+      return errorResponse(500, 'Failed to update session');
+    }
+
+    return jsonResponse(200, { session: data });
+  } else {
+    // Create new session
+    const { data, error } = await supabase
+      .from('ba_sessions')
+      .insert({
+        access_code: accessCode,
+        project_name: projectName || null,
+        conversation_history: conversationHistory || [],
+        status: 'started'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating BA session:', error);
+      return errorResponse(500, 'Failed to create session');
+    }
+
+    return jsonResponse(200, { session: data });
+  }
+}
+
+/**
+ * List all access codes (admin only)
+ * GET /ba/admin/access-codes
+ */
+async function handleBAGetAccessCodes(headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  const { data, error } = await supabase
+    .from('ba_access_codes')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching access codes:', error);
+    return errorResponse(500, 'Failed to fetch access codes');
+  }
+
+  return jsonResponse(200, { accessCodes: data });
+}
+
+/**
+ * Create new access code (admin only)
+ * POST /ba/admin/access-codes
+ */
+async function handleBACreateAccessCode(body, headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  const { code, clientName, expiresAt } = body;
+
+  if (!code || !clientName) {
+    return errorResponse(400, 'Code and client name are required');
+  }
+
+  // Validate code format (lowercase, alphanumeric, hyphens)
+  if (!/^[a-z0-9-]+$/.test(code)) {
+    return errorResponse(400, 'Code must be lowercase alphanumeric with hyphens only');
+  }
+
+  const { data, error } = await supabase
+    .from('ba_access_codes')
+    .insert({
+      code,
+      client_name: clientName,
+      expires_at: expiresAt || null,
+      is_active: true
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return errorResponse(409, 'Access code already exists');
+    }
+    console.error('Error creating access code:', error);
+    return errorResponse(500, 'Failed to create access code');
+  }
+
+  return jsonResponse(201, { accessCode: data });
+}
+
+/**
+ * Delete access code (admin only)
+ * DELETE /ba/admin/access-codes/:code
+ */
+async function handleBADeleteAccessCode(code, headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  const { error } = await supabase
+    .from('ba_access_codes')
+    .delete()
+    .eq('code', code);
+
+  if (error) {
+    console.error('Error deleting access code:', error);
+    return errorResponse(500, 'Failed to delete access code');
+  }
+
+  return jsonResponse(200, { success: true });
+}
+
+/**
+ * List all BA sessions (admin only)
+ * GET /ba/admin/sessions
+ */
+async function handleBAGetSessions(headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  const { data, error } = await supabase
+    .from('ba_sessions')
+    .select('id, access_code, project_name, status, created_at, updated_at, coverage_status')
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching BA sessions:', error);
+    return errorResponse(500, 'Failed to fetch sessions');
+  }
+
+  return jsonResponse(200, { sessions: data });
+}
+
+// BA System prompt for the AI Business Analyst
+const BA_SYSTEM_PROMPT = `You are an expert Business Analyst embedded in My Whisper, helping users document their project vision so it can be built. You speak in a warm, direct, and substantive way. No corporate stiffness, no jargon. You're like a knowledgeable friend who happens to be really good at extracting requirements.
+
+You adapt to what they're building: software, AI agents, workflows, automations, integrations. The questions shift based on the type of project, but the goal is always the same: get enough detail that a developer can build it without needing to come back with endless clarification questions.
+
+Voice & Tone:
+- Confident but not arrogant
+- Direct but not blunt
+- Warm but not performatively friendly
+- Helpful but not patronising
+- British English spellings always (colour, realise, analyse, behaviour)
+- No em-dashes. Use commas or full stops instead.
+- Build context before making points when things are complex
+- Be punchy when things are simple
+
+Natural phrases to use: "So basically...", "The thing is...", "Walk me through...", "What happens if...", "Got it. So..."
+
+Never say: "Please describe the primary user personas", "What are the business rules and constraints", "Could you elaborate on the functional requirements"
+
+Conversation approach:
+1. Let them talk freely first. Don't interrupt their initial dump.
+2. After they share, acknowledge what you heard: "Got it. So basically you're building [X] for [Y] so they can [Z]..."
+3. Identify what's missing or vague. Ask only what's needed, not a full checklist.
+4. Ask ONE question (or small cluster) at a time. Wait for response before moving on.
+5. Use options over open questions when something is ambiguous: "When you say 'admin', do you mean: (a) just yourself, (b) a few staff members, or (c) a whole team with different permission levels?"
+6. Tag priority in the moment: "You mentioned notifications. Is that essential for launch or something for later?"
+7. If they don't know something: "That's fine. I'll flag this as a decision for later. Let's keep going."
+
+Project type detection - adapt your questions:
+- Software/App: Focus on users, screens, data, workflows, permissions
+- AI Agent: Focus on triggers, decisions, tools, responses, edge cases
+- Workflow/Automation: Focus on trigger, steps, conditions, connections, errors
+- Integration: Focus on systems, data movement, triggers, sync logic
+
+Smart probing triggers:
+- Different types of users → "What can each type do that others can't?"
+- Approvals/reviews → "What happens if it's rejected?"
+- Money/payments → "Who pays whom, when, and for what?"
+- Time/scheduling → "What happens if someone misses a deadline or cancels?"
+- Vague feature → "What specifically does it track? Give me an example."
+
+For common patterns, offer defaults: "Most booking systems need: calendar view, availability management, reminders, and cancellation rules. Do you want all of these, or should we adjust?"
+
+Keep responses concise - aim for 2-4 sentences per response. Don't overwhelm them.
+
+CRITICAL REQUIREMENT - You MUST end every single response with a coverage JSON on its own line. Format exactly like this:
+
+[Your conversational response here]
+
+COVERAGE:{"vision":false,"users":false,"features":false,"rules":false,"data":false,"priority":false}
+
+Update each section to true ONLY when you have enough info:
+- vision=true: They explained what they're building and the problem
+- users=true: You know who uses it and their roles
+- features=true: You know the main functionality needed
+- rules=true: Business rules and constraints are captured
+- data=true: You know what data entities exist
+- priority=true: You know what's essential vs nice-to-have
+
+Example response:
+"Got it. So you're building a booking system for salons. Walk me through what happens when someone wants to book an appointment.
+
+COVERAGE:{"vision":true,"users":false,"features":false,"rules":false,"data":false,"priority":false}"
+
+Never skip the COVERAGE line. Always include it.`;
+
+/**
+ * Send a message and get AI response
+ * POST /ba/chat
+ */
+async function handleBAChat(body) {
+  const { sessionId, message, conversationHistory = [] } = body;
+
+  if (!sessionId) {
+    return errorResponse(400, 'Session ID is required');
+  }
+
+  if (!message) {
+    return errorResponse(400, 'Message is required');
+  }
+
+  if (!openaiClient) {
+    return errorResponse(500, 'OpenAI not configured');
+  }
+
+  try {
+    // Build messages for GPT
+    const messages = [
+      { role: 'system', content: BA_SYSTEM_PROMPT }
+    ];
+
+    // Add conversation history (excluding coverage markers)
+    for (const msg of conversationHistory) {
+      if (msg.role && msg.content) {
+        // Strip any coverage markers from assistant messages
+        let content = msg.content;
+        if (msg.role === 'assistant') {
+          content = content.replace(/\nCOVERAGE:\{[^}]+\}/g, '').trim();
+        }
+        messages.push({
+          role: msg.role,
+          content: content
+        });
+      }
+    }
+
+    // Add the new user message
+    messages.push({
+      role: 'user',
+      content: message
+    });
+
+    // Call GPT-4o-mini
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 500
+    });
+
+    const responseText = completion.choices[0].message.content;
+
+    // Parse coverage from response (match anywhere, with or without newline)
+    let coverage = null;
+    let cleanResponse = responseText;
+
+    const coverageMatch = responseText.match(/COVERAGE:(\{[^}]+\})/);
+    if (coverageMatch) {
+      try {
+        coverage = JSON.parse(coverageMatch[1]);
+        // Remove the coverage line from the response
+        cleanResponse = responseText.replace(/\n?COVERAGE:\{[^}]+\}/, '').trim();
+      } catch (e) {
+        console.error('Failed to parse coverage:', e);
+      }
+    }
+
+    return jsonResponse(200, {
+      response: cleanResponse,
+      coverage: coverage
+    });
+
+  } catch (error) {
+    console.error('BA Chat error:', error);
+    return errorResponse(500, error.message || 'Chat failed');
+  }
+}
+
+// Section labels for summaries
+const SECTION_LABELS = {
+  vision: 'Vision & Problem',
+  users: 'Users & Personas',
+  features: 'Features & Workflows',
+  rules: 'Business Rules',
+  data: 'Data & Entities',
+  priority: 'Priority & Scope'
+};
+
+/**
+ * Summarise what's been captured for a specific section
+ * POST /ba/summarise-section
+ */
+async function handleBASummariseSection(body) {
+  const { section, conversationHistory = [] } = body;
+
+  if (!section) {
+    return errorResponse(400, 'Section is required');
+  }
+
+  if (!SECTION_LABELS[section]) {
+    return errorResponse(400, 'Invalid section');
+  }
+
+  if (!openaiClient) {
+    return errorResponse(500, 'OpenAI not configured');
+  }
+
+  if (conversationHistory.length === 0) {
+    return jsonResponse(200, {
+      summary: 'No information captured yet. Start by describing your project.'
+    });
+  }
+
+  try {
+    // Build conversation text
+    const conversationText = conversationHistory
+      .map(msg => `${msg.role === 'user' ? 'User' : 'BA'}: ${msg.content}`)
+      .join('\n\n');
+
+    const sectionPrompts = {
+      vision: 'What is the product/service being built and what problem does it solve? Who is it for?',
+      users: 'Who are the different types of users? What are their roles, needs, and goals?',
+      features: 'What are the main features and workflows? What should users be able to do?',
+      rules: 'What are the business rules, constraints, and policies? What happens in edge cases?',
+      data: 'What data entities exist? What information is tracked and stored?',
+      priority: 'What is essential for launch vs nice-to-have? What is the scope?'
+    };
+
+    const response = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are summarising information from a business requirements conversation. Extract ONLY information relevant to: ${sectionPrompts[section]}
+
+If there's relevant information, summarise it in 2-4 bullet points. Use British English. Be concise and specific.
+
+If there's no relevant information for this section in the conversation, respond with exactly: "Not captured yet."`
+        },
+        {
+          role: 'user',
+          content: `Conversation:\n${conversationText}\n\nSummarise what's been captured for "${SECTION_LABELS[section]}".`
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 300
+    });
+
+    return jsonResponse(200, {
+      summary: response.choices[0].message.content.trim()
+    });
+
+  } catch (error) {
+    console.error('BA Summarise error:', error);
+    return errorResponse(500, error.message || 'Summarise failed');
+  }
+}
+
+/**
+ * Generate documentation from conversation history
+ * POST /ba/generate
+ */
+async function handleBAGenerate(body) {
+  const { sessionId, conversationHistory = [] } = body;
+
+  if (!sessionId) {
+    return errorResponse(400, 'Session ID is required');
+  }
+
+  if (conversationHistory.length === 0) {
+    return errorResponse(400, 'Conversation history is required');
+  }
+
+  if (!openaiClient) {
+    return errorResponse(500, 'OpenAI not configured');
+  }
+
+  try {
+    // Build conversation text (strip coverage markers)
+    const conversationText = conversationHistory
+      .map(msg => {
+        let content = msg.content;
+        if (msg.role === 'assistant') {
+          content = content.replace(/\nCOVERAGE:\{[^}]+\}/g, '').trim();
+        }
+        return `${msg.role === 'user' ? 'CLIENT' : 'BA'}: ${content}`;
+      })
+      .join('\n\n');
+
+    // Generate documentation using GPT-4o-mini
+    const generatePrompt = `You are a Business Analyst generating structured requirements documentation from a conversation.
+
+Based on the following conversation between a Business Analyst (BA) and a client, generate comprehensive documentation in markdown format.
+
+CONVERSATION:
+${conversationText}
+
+---
+
+Generate documentation with the following sections. Use British English. Be specific and actionable. Use information from the conversation - don't make things up.
+
+# [Project Name] - Requirements Documentation
+
+## Vision Statement
+A single paragraph capturing what this is, who it's for, and why it matters.
+
+## User Personas
+For each user type mentioned:
+### [Persona Name]
+**Who they are:** Brief description
+**What they're trying to do:** Goals (bullet list)
+**Pain points today:** Current frustrations (bullet list)
+**What success looks like:** Outcome
+
+## User Stories
+For the main features, use this format:
+### [Story Title]
+As a [persona], I want to [action], so that [benefit].
+
+**Acceptance criteria:**
+- Criterion 1
+- Criterion 2
+- Criterion 3
+
+## Functional Requirements
+Group by feature area:
+### [Feature Area]
+- Requirement 1
+- Requirement 2
+
+## Business Rules
+### BR-001: [Rule Name]
+**Rule:** What must be true
+**Applies to:** Where this applies
+**Example:** Concrete example
+
+## Data Entities
+### [Entity Name]
+**What it is:** Description
+**Key information tracked:**
+- Field: Purpose
+
+## Priority Matrix
+### Must Have (Version 1)
+- Feature: Rationale
+
+### Should Have
+- Feature: Rationale
+
+### Could Have (Later)
+- Feature: Rationale
+
+## Open Questions
+List any unclear items or decisions needed:
+- Question 1
+- Question 2
+
+---
+
+If a section has no relevant information from the conversation, write "Not discussed yet." for that section.
+Output only the markdown documentation, nothing else.`;
+
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'user', content: generatePrompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 4000
+    });
+
+    const fullDocument = completion.choices[0].message.content.trim();
+
+    // Parse sections from the document
+    const sections = {
+      all: fullDocument,
+      vision: extractSection(fullDocument, 'Vision Statement'),
+      users: extractSection(fullDocument, 'User Personas'),
+      features: extractSection(fullDocument, 'User Stories') + '\n\n' + extractSection(fullDocument, 'Functional Requirements'),
+      rules: extractSection(fullDocument, 'Business Rules'),
+      data: extractSection(fullDocument, 'Data Entities'),
+      priority: extractSection(fullDocument, 'Priority Matrix') + '\n\n' + extractSection(fullDocument, 'Open Questions')
+    };
+
+    // Save to session
+    if (supabase) {
+      const { error } = await supabase
+        .from('ba_sessions')
+        .update({
+          generated_docs: sections,
+          status: 'complete',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
+
+      if (error) {
+        console.error('Error saving generated docs:', error);
+      }
+    }
+
+    return jsonResponse(200, {
+      documents: sections,
+      status: 'complete'
+    });
+
+  } catch (error) {
+    console.error('BA Generate error:', error);
+    return errorResponse(500, error.message || 'Generation failed');
+  }
+}
+
+/**
+ * Extract a section from markdown by heading
+ */
+function extractSection(markdown, headingName) {
+  const lines = markdown.split('\n');
+  let inSection = false;
+  let sectionLines = [];
+  const headingPattern = new RegExp(`^##\\s+${headingName}`, 'i');
+
+  for (const line of lines) {
+    if (headingPattern.test(line)) {
+      inSection = true;
+      sectionLines.push(line);
+      continue;
+    }
+
+    if (inSection) {
+      // Check if we hit another h2 heading
+      if (/^##\s+/.test(line) && !headingPattern.test(line)) {
+        break;
+      }
+      sectionLines.push(line);
+    }
+  }
+
+  return sectionLines.join('\n').trim() || 'Not discussed yet.';
+}
+
+/**
+ * Transcribe audio for BA (Whisper only, no DB save)
+ * POST /ba/transcribe
+ */
+async function handleBATranscribe(body) {
+  const { fileUrl } = body;
+
+  if (!fileUrl) {
+    return errorResponse(400, 'File URL is required');
+  }
+
+  if (!openaiClient) {
+    return errorResponse(500, 'OpenAI not configured');
+  }
+
+  try {
+    // Download audio from S3
+    const audioBuffer = await downloadFromS3(fileUrl);
+
+    // Determine file extension from URL
+    const urlPath = new URL(fileUrl).pathname;
+    const ext = urlPath.substring(urlPath.lastIndexOf('.')) || '.webm';
+
+    // Write to temp file for OpenAI
+    const tempPath = `/tmp/ba_audio_${Date.now()}${ext}`;
+    fs.writeFileSync(tempPath, audioBuffer);
+
+    // Transcribe with Whisper
+    const transcription = await openaiClient.audio.transcriptions.create({
+      file: fs.createReadStream(tempPath),
+      model: 'whisper-1',
+      language: 'en'
+    });
+
+    // Clean up temp file
+    fs.unlinkSync(tempPath);
+
+    return jsonResponse(200, {
+      transcription: transcription.text
+    });
+
+  } catch (error) {
+    console.error('BA Transcription error:', error);
+    return errorResponse(500, error.message || 'Transcription failed');
+  }
+}
+
 // Main handler
 exports.handler = async (event) => {
   // Initialize clients on cold start
@@ -1069,6 +1796,58 @@ exports.handler = async (event) => {
       if (method === 'DELETE') {
         return await handleDeleteTranscript(id, userId);
       }
+    }
+
+    // ============================================
+    // BA (Business Analyst) Routes
+    // ============================================
+
+    // Client routes
+    if (path === '/ba/validate-code' && method === 'POST') {
+      return await handleBAValidateCode(body);
+    }
+
+    if (path === '/ba/session' && method === 'GET') {
+      return await handleBAGetSession(queryParams);
+    }
+
+    if (path === '/ba/session' && method === 'PUT') {
+      return await handleBAUpdateSession(body);
+    }
+
+    if (path === '/ba/transcribe' && method === 'POST') {
+      return await handleBATranscribe(body);
+    }
+
+    if (path === '/ba/chat' && method === 'POST') {
+      return await handleBAChat(body);
+    }
+
+    if (path === '/ba/summarise-section' && method === 'POST') {
+      return await handleBASummariseSection(body);
+    }
+
+    if (path === '/ba/generate' && method === 'POST') {
+      return await handleBAGenerate(body);
+    }
+
+    // Admin routes
+    if (path === '/ba/admin/access-codes' && method === 'GET') {
+      return await handleBAGetAccessCodes(headers);
+    }
+
+    if (path === '/ba/admin/access-codes' && method === 'POST') {
+      return await handleBACreateAccessCode(body, headers);
+    }
+
+    // Match /ba/admin/access-codes/:code
+    const baAccessCodeMatch = path.match(/^\/ba\/admin\/access-codes\/([^\/]+)$/);
+    if (baAccessCodeMatch && method === 'DELETE') {
+      return await handleBADeleteAccessCode(baAccessCodeMatch[1], headers);
+    }
+
+    if (path === '/ba/admin/sessions' && method === 'GET') {
+      return await handleBAGetSessions(headers);
     }
 
     return errorResponse(404, 'Not found');

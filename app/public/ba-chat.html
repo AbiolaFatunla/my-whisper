@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="AI Business Analyst - Document your project requirements">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>AI Business Analyst</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* BA Chat styles */
+        body {
+            background: var(--bg-primary);
+        }
+
+        .ba-chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+            background: var(--bg-primary);
+        }
+
+        /* Header */
+        .ba-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .ba-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ba-back-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+
+        .ba-back-btn:hover {
+            background: var(--bg-secondary);
+        }
+
+        .ba-header-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .ba-header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Progress bar */
+        .ba-progress {
+            display: flex;
+            gap: 8px;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .ba-progress::-webkit-scrollbar {
+            display: none;
+        }
+
+        .ba-progress-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ba-progress-item.covered {
+            background: rgba(249, 115, 22, 0.1);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .ba-progress-item.covered:hover {
+            background: rgba(249, 115, 22, 0.15);
+        }
+
+        .ba-progress-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-tertiary);
+        }
+
+        .ba-progress-item.covered .ba-progress-dot {
+            background: var(--primary);
+        }
+
+        /* Chat messages */
+        .ba-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .ba-message {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 16px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+
+        .ba-message.assistant {
+            align-self: flex-start;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+        }
+
+        .ba-message.user {
+            align-self: flex-end;
+            background: var(--gradient-primary);
+            color: white;
+        }
+
+        .ba-message-time {
+            font-size: 0.7rem;
+            opacity: 0.6;
+            margin-top: 6px;
+        }
+
+        .ba-message.user .ba-message-time {
+            text-align: right;
+        }
+
+        /* Audio indicator in user message */
+        .ba-message-audio {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .ba-message-audio svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Input area */
+        .ba-input-area {
+            padding: 16px 20px;
+            padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+        }
+
+        /* Recording state */
+        .ba-recorder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ba-record-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: none;
+            background: var(--gradient-primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .ba-record-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(249, 115, 22, 0.4);
+        }
+
+        .ba-record-btn.recording {
+            animation: pulse 1.5s ease-in-out infinite;
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+        }
+
+        .ba-record-hint {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+        }
+
+        .ba-record-timer {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Waveform */
+        .ba-waveform-container {
+            width: 100%;
+            max-width: 300px;
+            height: 60px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .ba-waveform-container canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Transcript review */
+        .ba-review {
+            display: none;
+        }
+
+        .ba-review.visible {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ba-review-audio {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+        }
+
+        .ba-review-audio button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ba-review-duration {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .ba-review-textarea {
+            width: 100%;
+            min-height: 80px;
+            max-height: 200px;
+            padding: 14px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            line-height: 1.5;
+            border: 2px solid var(--glass-border);
+            border-radius: 12px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            resize: vertical;
+        }
+
+        .ba-review-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .ba-review-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .ba-review-btn {
+            flex: 1;
+            padding: 12px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ba-review-btn.discard {
+            background: transparent;
+            border: 2px solid var(--glass-border);
+            color: var(--text-secondary);
+        }
+
+        .ba-review-btn.discard:hover {
+            border-color: var(--text-tertiary);
+        }
+
+        .ba-review-btn.send {
+            background: var(--gradient-primary);
+            border: none;
+            color: white;
+        }
+
+        .ba-review-btn.send:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+
+        .ba-review-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Type instead option */
+        .ba-type-toggle {
+            text-align: center;
+            padding-top: 8px;
+        }
+
+        .ba-type-toggle button {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .ba-type-toggle button:hover {
+            color: var(--text-secondary);
+        }
+
+        /* Text input mode */
+        .ba-text-input {
+            display: none;
+        }
+
+        .ba-text-input.visible {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ba-text-input-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .ba-text-input textarea {
+            flex: 1;
+            min-height: 44px;
+            max-height: 120px;
+            padding: 12px 16px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            line-height: 1.4;
+            border: 2px solid var(--glass-border);
+            border-radius: 22px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            resize: none;
+        }
+
+        .ba-text-input textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .ba-text-send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--gradient-primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .ba-text-send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Loading state */
+        .ba-loading {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px;
+            color: var(--text-secondary);
+        }
+
+        .ba-loading.visible {
+            display: flex;
+        }
+
+        .ba-loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--glass-border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast */
+        .ba-toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 12px 24px;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .ba-toast.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 767px) {
+            .ba-message {
+                max-width: 90%;
+            }
+
+            .ba-record-btn {
+                width: 72px;
+                height: 72px;
+            }
+        }
+
+        /* Modal styles */
+        .ba-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .ba-modal-overlay.visible {
+            display: flex;
+        }
+
+        .ba-modal {
+            background: var(--bg-primary);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .ba-modal-wide {
+            max-width: 600px;
+        }
+
+        .ba-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .ba-modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: capitalize;
+        }
+
+        .ba-modal-close {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+
+        .ba-modal-close:hover {
+            background: var(--bg-secondary);
+        }
+
+        .ba-modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .ba-modal-intro {
+            margin: 0 0 16px 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .ba-modal-content {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            white-space: pre-wrap;
+        }
+
+        .ba-modal-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 20px;
+            color: var(--text-secondary);
+        }
+
+        .ba-modal-actions {
+            display: flex;
+            gap: 12px;
+            padding: 16px 20px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .ba-modal-btn {
+            flex: 1;
+            padding: 12px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ba-modal-btn.secondary {
+            background: transparent;
+            border: 2px solid var(--glass-border);
+            color: var(--text-secondary);
+        }
+
+        .ba-modal-btn.secondary:hover {
+            border-color: var(--text-tertiary);
+        }
+
+        .ba-modal-btn.primary {
+            background: var(--gradient-primary);
+            border: none;
+            color: white;
+        }
+
+        .ba-modal-btn.primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+
+        .ba-modal-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Review sections list */
+        .ba-review-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ba-review-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .ba-review-section.covered {
+            border-color: var(--primary);
+        }
+
+        .ba-review-section-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .ba-review-section.covered .ba-review-section-icon {
+            background: rgba(249, 115, 22, 0.1);
+            color: var(--primary);
+        }
+
+        .ba-review-section:not(.covered) .ba-review-section-icon {
+            background: var(--bg-secondary);
+            color: var(--text-tertiary);
+            border: 2px solid var(--glass-border);
+        }
+
+        .ba-review-section-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .ba-review-section-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .ba-review-section-status {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            margin-top: 2px;
+        }
+
+        .ba-review-section-btn {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: inherit;
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ba-review-section-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Generate button in header */
+        .ba-generate-btn {
+            display: none;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: inherit;
+            background: var(--gradient-primary);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ba-generate-btn.visible {
+            display: block;
+        }
+
+        .ba-generate-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+
+        @media (max-width: 767px) {
+            .ba-modal {
+                max-height: 90vh;
+            }
+
+            .ba-modal-content {
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Output view styles */
+        .ba-output-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-primary);
+            display: none;
+            flex-direction: column;
+            z-index: 1100;
+        }
+
+        .ba-output-overlay.visible {
+            display: flex;
+        }
+
+        .ba-output-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .ba-output-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .ba-output-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .ba-output-tabs {
+            display: flex;
+            gap: 4px;
+            padding: 12px 20px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .ba-output-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .ba-output-tab {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            font-family: inherit;
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .ba-output-tab:hover {
+            border-color: var(--text-tertiary);
+        }
+
+        .ba-output-tab.active {
+            background: var(--gradient-primary);
+            border-color: transparent;
+            color: white;
+        }
+
+        .ba-output-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-primary);
+        }
+
+        .ba-output-content pre {
+            background: var(--bg-secondary);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .ba-output-content h1 {
+            font-size: 1.5rem;
+            margin: 0 0 16px 0;
+            color: var(--text-primary);
+        }
+
+        .ba-output-content h2 {
+            font-size: 1.25rem;
+            margin: 24px 0 12px 0;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 8px;
+        }
+
+        .ba-output-content h3 {
+            font-size: 1.1rem;
+            margin: 20px 0 8px 0;
+            color: var(--text-primary);
+        }
+
+        .ba-output-content p {
+            margin: 0 0 12px 0;
+        }
+
+        .ba-output-content ul, .ba-output-content ol {
+            margin: 0 0 12px 0;
+            padding-left: 24px;
+        }
+
+        .ba-output-content li {
+            margin: 4px 0;
+        }
+
+        .ba-output-content strong {
+            color: var(--text-primary);
+        }
+
+        .ba-output-actions {
+            display: flex;
+            gap: 12px;
+            padding: 16px 20px;
+            border-top: 1px solid var(--glass-border);
+            flex-wrap: wrap;
+        }
+
+        .ba-output-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: inherit;
+            background: var(--gradient-primary);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ba-output-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+
+        .ba-output-btn.secondary {
+            background: transparent;
+            border: 2px solid var(--glass-border);
+            color: var(--text-secondary);
+        }
+
+        .ba-output-btn.secondary:hover {
+            border-color: var(--text-tertiary);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .ba-output-btn svg {
+            flex-shrink: 0;
+        }
+
+        /* Generating state */
+        .ba-generating {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 16px;
+            color: var(--text-secondary);
+        }
+
+        .ba-generating-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--glass-border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @media (max-width: 767px) {
+            .ba-output-header {
+                padding: 12px 16px;
+            }
+
+            .ba-output-tabs {
+                padding: 12px 16px;
+            }
+
+            .ba-output-content {
+                padding: 16px;
+            }
+
+            .ba-output-actions {
+                padding: 12px 16px;
+            }
+
+            .ba-output-btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <div class="ba-chat-container">
+        <!-- Header -->
+        <header class="ba-header">
+            <div class="ba-header-left">
+                <button class="ba-back-btn" id="backBtn" aria-label="Go back">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+                <span class="ba-header-title" id="headerTitle">New Session</span>
+            </div>
+            <div class="ba-header-right">
+                <button class="ba-generate-btn" id="generateBtn">Ready to generate</button>
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+                    <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Progress bar -->
+        <div class="ba-progress" id="progressBar">
+            <div class="ba-progress-item" data-section="vision">
+                <span class="ba-progress-dot"></span>
+                Vision
+            </div>
+            <div class="ba-progress-item" data-section="users">
+                <span class="ba-progress-dot"></span>
+                Users
+            </div>
+            <div class="ba-progress-item" data-section="features">
+                <span class="ba-progress-dot"></span>
+                Features
+            </div>
+            <div class="ba-progress-item" data-section="rules">
+                <span class="ba-progress-dot"></span>
+                Rules
+            </div>
+            <div class="ba-progress-item" data-section="data">
+                <span class="ba-progress-dot"></span>
+                Data
+            </div>
+            <div class="ba-progress-item" data-section="priority">
+                <span class="ba-progress-dot"></span>
+                Priority
+            </div>
+        </div>
+
+        <!-- Chat messages -->
+        <div class="ba-messages" id="messagesContainer">
+            <!-- Messages will be inserted here -->
+        </div>
+
+        <!-- Loading indicator -->
+        <div class="ba-loading" id="loadingIndicator">
+            <div class="ba-loading-spinner"></div>
+            <span>Thinking...</span>
+        </div>
+
+        <!-- Input area -->
+        <div class="ba-input-area">
+            <!-- Recording mode -->
+            <div class="ba-recorder" id="recorderSection">
+                <div class="ba-waveform-container" id="waveformContainer" style="display: none;">
+                    <canvas id="waveformCanvas" width="300" height="60"></canvas>
+                </div>
+                <span class="ba-record-timer" id="recordTimer" style="display: none;">00:00</span>
+                <button class="ba-record-btn" id="recordBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                </button>
+                <span class="ba-record-hint" id="recordHint">Tap to record</span>
+
+                <div class="ba-type-toggle">
+                    <button id="typeToggleBtn">or type instead</button>
+                </div>
+            </div>
+
+            <!-- Transcript review mode -->
+            <div class="ba-review" id="reviewSection">
+                <div class="ba-review-audio">
+                    <button id="playReviewBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                    </button>
+                    <span class="ba-review-duration" id="reviewDuration">00:00</span>
+                </div>
+                <textarea class="ba-review-textarea" id="reviewTextarea" placeholder="Edit your message..."></textarea>
+                <div class="ba-review-actions">
+                    <button class="ba-review-btn discard" id="discardBtn">Discard</button>
+                    <button class="ba-review-btn send" id="sendBtn">Send</button>
+                </div>
+            </div>
+
+            <!-- Text input mode -->
+            <div class="ba-text-input" id="textInputSection">
+                <div class="ba-text-input-row">
+                    <textarea id="textInput" placeholder="Type your message..." rows="1"></textarea>
+                    <button class="ba-text-send-btn" id="textSendBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="ba-type-toggle">
+                    <button id="recordToggleBtn">or record instead</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="ba-toast" id="toast"></div>
+
+    <!-- Section Review Modal -->
+    <div class="ba-modal-overlay" id="sectionModal">
+        <div class="ba-modal">
+            <div class="ba-modal-header">
+                <h3 id="sectionModalTitle">Vision</h3>
+                <button class="ba-modal-close" id="closeSectionModal">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="ba-modal-body">
+                <p class="ba-modal-intro">Here's what I have so far:</p>
+                <div class="ba-modal-content" id="sectionModalContent">
+                    <div class="ba-modal-loading">
+                        <div class="ba-loading-spinner"></div>
+                        <span>Summarising...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="ba-modal-actions">
+                <button class="ba-modal-btn secondary" id="addMoreBtn">Add more</button>
+                <button class="ba-modal-btn primary" id="looksGoodBtn">Looks good</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pre-Generation Review Modal -->
+    <div class="ba-modal-overlay" id="reviewModal">
+        <div class="ba-modal ba-modal-wide">
+            <div class="ba-modal-header">
+                <h3>Review before generating</h3>
+                <button class="ba-modal-close" id="closeReviewModal">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="ba-modal-body">
+                <p class="ba-modal-intro">Have a look at what I've captured. Add more if needed.</p>
+                <div class="ba-review-sections" id="reviewSections">
+                    <!-- Sections will be populated by JS -->
+                </div>
+            </div>
+            <div class="ba-modal-actions">
+                <button class="ba-modal-btn secondary" id="backToConversationBtn">Back to conversation</button>
+                <button class="ba-modal-btn primary" id="generateDocsBtn" disabled>Generate documents</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Output Documents View -->
+    <div class="ba-output-overlay" id="outputView">
+        <div class="ba-output-container">
+            <div class="ba-output-header">
+                <h2>Requirements Documentation</h2>
+                <button class="ba-modal-close" id="closeOutputView">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="ba-output-tabs" id="outputTabs">
+                <button class="ba-output-tab active" data-tab="all">All</button>
+                <button class="ba-output-tab" data-tab="vision">Vision</button>
+                <button class="ba-output-tab" data-tab="users">Users</button>
+                <button class="ba-output-tab" data-tab="features">Features</button>
+                <button class="ba-output-tab" data-tab="rules">Rules</button>
+                <button class="ba-output-tab" data-tab="data">Data</button>
+                <button class="ba-output-tab" data-tab="priority">Priority</button>
+            </div>
+            <div class="ba-output-content" id="outputContent">
+                <!-- Generated markdown will be displayed here -->
+            </div>
+            <div class="ba-output-actions">
+                <button class="ba-output-btn" id="copyDocsBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                    </svg>
+                    Copy
+                </button>
+                <button class="ba-output-btn" id="downloadDocsBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download .md
+                </button>
+                <button class="ba-output-btn secondary" id="newSessionBtn">Start new session</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="recorder.js"></script>
+    <script src="uploader.js"></script>
+    <script src="ba-chat.js"></script>
+</body>
+</html>

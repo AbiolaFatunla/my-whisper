@@ -315,6 +315,7 @@ async function personalizeText(userId, text, minCount = 2) {
 
 module.exports = {
   initSupabase,
+  get supabase() { return supabase; },
   generateId,
   saveTranscript,
   getTranscript,

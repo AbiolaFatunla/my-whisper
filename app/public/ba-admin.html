@@ -237,6 +237,137 @@
             gap: 8px;
         }
 
+        /* Session Group (collapsible) */
+        .ba-session-group {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .ba-session-group:hover {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .ba-session-group-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .ba-session-group-header:hover {
+            background: var(--bg-secondary);
+        }
+
+        .ba-session-group-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .ba-toggle-icon {
+            transition: transform 0.2s;
+            color: var(--text-secondary);
+        }
+
+        .ba-session-group.expanded .ba-toggle-icon {
+            transform: rotate(90deg);
+        }
+
+        .ba-session-group-info {
+            flex: 1;
+        }
+
+        .ba-session-group-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .ba-session-group-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .ba-session-group-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .ba-session-group-content {
+            display: none;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .ba-session-group.expanded .ba-session-group-content {
+            display: block;
+        }
+
+        /* Grouped session row */
+        .ba-grouped-session {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px 12px 56px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.2s;
+        }
+
+        .ba-grouped-session:last-child {
+            border-bottom: none;
+        }
+
+        .ba-grouped-session:hover {
+            background: var(--bg-card);
+        }
+
+        .ba-grouped-session-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .ba-grouped-session-num {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            min-width: 24px;
+        }
+
+        .ba-grouped-session-date {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .ba-grouped-session-project {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .ba-grouped-session-coverage {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
         /* Access Code Card */
         .ba-code-card {
             display: flex;

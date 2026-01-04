@@ -231,7 +231,47 @@ function getClientNameForCode(code) {
 }
 
 /**
- * Render sessions list
+ * Get session coverage count
+ */
+function getSessionCoverage(session) {
+    const coverage = session.coverage_status || {};
+    return Object.values(coverage).filter(Boolean).length;
+}
+
+/**
+ * Group sessions by access code
+ */
+function groupSessionsByCode(sessions) {
+    const groups = {};
+
+    sessions.forEach(session => {
+        const code = session.access_code;
+        if (!groups[code]) {
+            groups[code] = [];
+        }
+        groups[code].push(session);
+    });
+
+    // Sort sessions within each group: complete first, then by coverage, then by date
+    Object.values(groups).forEach(groupSessions => {
+        groupSessions.sort((a, b) => {
+            // Complete sessions first
+            if (a.status === 'complete' && b.status !== 'complete') return -1;
+            if (b.status === 'complete' && a.status !== 'complete') return 1;
+            // Then by coverage count
+            const coverageA = getSessionCoverage(a);
+            const coverageB = getSessionCoverage(b);
+            if (coverageA !== coverageB) return coverageB - coverageA;
+            // Then by date (most recent first)
+            return new Date(b.updated_at) - new Date(a.updated_at);
+        });
+    });
+
+    return groups;
+}
+
+/**
+ * Render sessions list grouped by access code
  */
 function renderSessions() {
     if (sessions.length === 0) {
@@ -239,71 +279,180 @@ function renderSessions() {
         return;
     }
 
-    sessionsList.innerHTML = sessions.map(session => {
-        const clientName = getClientNameForCode(session.access_code);
-        const projectName = session.project_name;
-        // Show client name first (your label), then project name (their label) if different
-        let displayName = clientName || 'Unknown Client';
-        if (projectName && projectName !== clientName) {
-            displayName += ` - ${projectName}`;
+    const groups = groupSessionsByCode(sessions);
+
+    // Sort groups by most recent activity
+    const sortedCodes = Object.keys(groups).sort((a, b) => {
+        const latestA = new Date(groups[a][0].updated_at);
+        const latestB = new Date(groups[b][0].updated_at);
+        return latestB - latestA;
+    });
+
+    sessionsList.innerHTML = sortedCodes.map(code => {
+        const groupSessions = groups[code];
+        const clientName = getClientNameForCode(code) || 'Unknown Client';
+        const sessionCount = groupSessions.length;
+        const bestSession = groupSessions[0]; // Already sorted, first is best
+        const bestCoverage = getSessionCoverage(bestSession);
+        const hasComplete = groupSessions.some(s => s.status === 'complete');
+
+        // Single session - show directly without accordion
+        if (sessionCount === 1) {
+            return renderSingleSession(groupSessions[0], clientName);
         }
 
-        const status = session.status || 'started';
-        const code = session.access_code;
-        const date = new Date(session.updated_at).toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-        });
-
-        // Count covered sections
-        const coverage = session.coverage_status || {};
-        const coveredCount = Object.values(coverage).filter(Boolean).length;
-
+        // Multiple sessions - show as collapsible group
         return `
-            <div class="ba-card ba-session-card" data-id="${session.id}" data-code="${code}">
-                <div class="ba-session-info">
-                    <div class="ba-session-name">${escapeHtml(displayName)}</div>
-                    <div class="ba-session-meta">
-                        <span>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                            </svg>
-                            ${escapeHtml(code)}
-                        </span>
-                        <span>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12 6 12 12 16 14"/>
-                            </svg>
-                            ${date}
-                        </span>
-                        <span>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                                <polyline points="22 4 12 14.01 9 11.01"/>
-                            </svg>
-                            ${coveredCount}/6 sections
-                        </span>
-                    </div>
-                </div>
-                <span class="ba-session-status ${status}">
-                    <span class="ba-session-status-dot"></span>
-                    ${status.replace('_', ' ')}
-                </span>
-                <div class="ba-session-actions">
-                    <button class="ba-btn ba-btn-secondary ba-btn-sm" onclick="viewSession('${session.id}')">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                            <circle cx="12" cy="12" r="3"/>
+            <div class="ba-session-group" data-code="${escapeHtml(code)}">
+                <div class="ba-session-group-header" onclick="toggleSessionGroup('${escapeHtml(code)}')">
+                    <div class="ba-session-group-toggle">
+                        <svg class="ba-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"/>
                         </svg>
-                        View
-                    </button>
+                    </div>
+                    <div class="ba-session-group-info">
+                        <div class="ba-session-group-name">${escapeHtml(clientName)}</div>
+                        <div class="ba-session-group-meta">
+                            <span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                                ${escapeHtml(code)}
+                            </span>
+                            <span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                ${sessionCount} sessions
+                            </span>
+                            <span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <polyline points="22 4 12 14.01 9 11.01"/>
+                                </svg>
+                                Best: ${bestCoverage}/6
+                            </span>
+                        </div>
+                    </div>
+                    ${hasComplete ? '<span class="ba-session-status complete"><span class="ba-session-status-dot"></span>has complete</span>' : ''}
+                </div>
+                <div class="ba-session-group-content">
+                    ${groupSessions.map((session, index) => renderGroupedSession(session, index + 1)).join('')}
                 </div>
             </div>
         `;
     }).join('');
+}
+
+/**
+ * Render a single session (not in a group)
+ */
+function renderSingleSession(session, clientName) {
+    const projectName = session.project_name;
+    let displayName = clientName;
+    if (projectName && projectName !== clientName) {
+        displayName += ` - ${projectName}`;
+    }
+
+    const status = session.status || 'started';
+    const code = session.access_code;
+    const date = new Date(session.updated_at).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+    const coveredCount = getSessionCoverage(session);
+
+    return `
+        <div class="ba-card ba-session-card" data-id="${session.id}" data-code="${code}">
+            <div class="ba-session-info">
+                <div class="ba-session-name">${escapeHtml(displayName)}</div>
+                <div class="ba-session-meta">
+                    <span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                        ${escapeHtml(code)}
+                    </span>
+                    <span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        ${date}
+                    </span>
+                    <span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        ${coveredCount}/6 sections
+                    </span>
+                </div>
+            </div>
+            <span class="ba-session-status ${status}">
+                <span class="ba-session-status-dot"></span>
+                ${status.replace('_', ' ')}
+            </span>
+            <div class="ba-session-actions">
+                <button class="ba-btn ba-btn-secondary ba-btn-sm" onclick="viewSession('${session.id}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    View
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Render a session within a group
+ */
+function renderGroupedSession(session, index) {
+    const status = session.status || 'started';
+    const date = new Date(session.updated_at).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+    const coveredCount = getSessionCoverage(session);
+    const projectName = session.project_name;
+
+    return `
+        <div class="ba-grouped-session" data-id="${session.id}">
+            <div class="ba-grouped-session-info">
+                <span class="ba-grouped-session-num">#${index}</span>
+                <span class="ba-grouped-session-date">${date}</span>
+                ${projectName ? `<span class="ba-grouped-session-project">${escapeHtml(projectName)}</span>` : ''}
+                <span class="ba-grouped-session-coverage">${coveredCount}/6</span>
+                <span class="ba-session-status ${status}">
+                    <span class="ba-session-status-dot"></span>
+                    ${status.replace('_', ' ')}
+                </span>
+            </div>
+            <button class="ba-btn ba-btn-secondary ba-btn-sm" onclick="viewSession('${session.id}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>
+                View
+            </button>
+        </div>
+    `;
+}
+
+/**
+ * Toggle session group expand/collapse
+ */
+function toggleSessionGroup(code) {
+    const group = document.querySelector(`.ba-session-group[data-code="${code}"]`);
+    if (group) {
+        group.classList.toggle('expanded');
+    }
 }
 
 /**
@@ -625,3 +774,4 @@ if (document.readyState === 'loading') {
 window.viewSession = viewSession;
 window.copyCode = copyCode;
 window.revokeCode = revokeCode;
+window.toggleSessionGroup = toggleSessionGroup;

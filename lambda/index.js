@@ -1253,6 +1253,34 @@ async function handleBAGetSessions(headers) {
   return jsonResponse(200, { sessions: data });
 }
 
+/**
+ * Get single BA session by ID (admin only)
+ * GET /ba/admin/sessions/:id
+ */
+async function handleBAGetSessionById(sessionId, headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  const { data, error } = await supabase
+    .from('ba_sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching BA session:', error);
+    return errorResponse(500, 'Failed to fetch session');
+  }
+
+  if (!data) {
+    return errorResponse(404, 'Session not found');
+  }
+
+  return jsonResponse(200, { session: data });
+}
+
 // BA System prompt for the AI Business Analyst
 const BA_SYSTEM_PROMPT = `You are an expert Business Analyst embedded in My Whisper, helping users document their project vision so it can be built. You speak in a warm, direct, and substantive way. No corporate stiffness, no jargon. You're like a knowledgeable friend who happens to be really good at extracting requirements.
 
@@ -1848,6 +1876,12 @@ exports.handler = async (event) => {
 
     if (path === '/ba/admin/sessions' && method === 'GET') {
       return await handleBAGetSessions(headers);
+    }
+
+    // Match /ba/admin/sessions/:id
+    const baSessionIdMatch = path.match(/^\/ba\/admin\/sessions\/([^\/]+)$/);
+    if (baSessionIdMatch && method === 'GET') {
+      return await handleBAGetSessionById(baSessionIdMatch[1], headers);
     }
 
     return errorResponse(404, 'Not found');

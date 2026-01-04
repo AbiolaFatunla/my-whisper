@@ -1388,6 +1388,38 @@ app.get('/api/ba/admin/sessions', async (req, res) => {
   }
 });
 
+// Get single BA session by ID (admin only)
+app.get('/api/ba/admin/sessions/:id', async (req, res) => {
+  try {
+    const adminCheck = isAdminUser(req);
+    if (!adminCheck.isAdmin) {
+      return res.status(401).json({ error: 'Admin authentication required' });
+    }
+
+    const { id } = req.params;
+
+    const { data, error } = await database.supabase
+      .from('ba_sessions')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching BA session:', error);
+      return res.status(500).json({ error: 'Failed to fetch session' });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    res.json({ session: data });
+  } catch (error) {
+    console.error('Error fetching BA session:', error);
+    res.status(500).json({ error: 'Failed to fetch session' });
+  }
+});
+
 // Start server (only when running directly, not in Lambda)
 if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
   app.listen(PORT, () => {

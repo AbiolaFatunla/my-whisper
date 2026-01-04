@@ -293,7 +293,7 @@ function renderSessions() {
                     ${status.replace('_', ' ')}
                 </span>
                 <div class="ba-session-actions">
-                    <button class="ba-btn ba-btn-secondary ba-btn-sm" onclick="viewSession('${session.id}', '${code}')">
+                    <button class="ba-btn ba-btn-secondary ba-btn-sm" onclick="viewSession('${session.id}')">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                             <circle cx="12" cy="12" r="3"/>
@@ -309,14 +309,15 @@ function renderSessions() {
 /**
  * View session details
  */
-async function viewSession(sessionId, accessCode) {
+async function viewSession(sessionId) {
     modalSessionTitle.textContent = 'Loading...';
     modalConversation.innerHTML = '<div class="ba-loading"><div class="ba-spinner"></div></div>';
     modalDocs.innerHTML = '<p style="color: var(--text-secondary);">Loading...</p>';
     sessionModal.classList.add('active');
 
     try {
-        const response = await authFetch(`${config.apiUrl}/ba/session?code=${encodeURIComponent(accessCode)}`);
+        // Fetch by session ID to get the correct session
+        const response = await authFetch(`${config.apiUrl}/ba/admin/sessions/${encodeURIComponent(sessionId)}`);
         const data = await response.json();
 
         if (!response.ok || !data.session) {
@@ -324,7 +325,13 @@ async function viewSession(sessionId, accessCode) {
         }
 
         const session = data.session;
-        modalSessionTitle.textContent = session.project_name || 'Untitled Session';
+        // Show client name (from access code) + project name
+        const clientName = getClientNameForCode(session.access_code);
+        let title = clientName || 'Unknown Client';
+        if (session.project_name && session.project_name !== clientName) {
+            title += ` - ${session.project_name}`;
+        }
+        modalSessionTitle.textContent = title;
 
         // Render conversation
         const conversation = session.conversation_history || [];
@@ -349,8 +356,8 @@ async function viewSession(sessionId, accessCode) {
 
         // Render generated docs
         const docs = session.generated_docs;
-        if (docs && docs.combined) {
-            modalDocs.innerHTML = markdownToHtml(docs.combined);
+        if (docs && (docs.all || docs.combined)) {
+            modalDocs.innerHTML = markdownToHtml(docs.all || docs.combined);
         } else {
             modalDocs.innerHTML = '<p style="color: var(--text-secondary);">Documents not yet generated</p>';
         }

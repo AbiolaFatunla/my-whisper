@@ -42,9 +42,16 @@ const modalSessionTitle = document.getElementById('modalSessionTitle');
 const modalConversation = document.getElementById('modalConversation');
 const modalDocs = document.getElementById('modalDocs');
 const closeSessionModal = document.getElementById('closeSessionModal');
+const modalFooter = document.getElementById('modalFooter');
+const copyDocsBtn = document.getElementById('copyDocsBtn');
+const downloadDocsBtn = document.getElementById('downloadDocsBtn');
 
 // Toast
 const toast = document.getElementById('toast');
+
+// Current session docs (for copy/download)
+let currentSessionDocs = null;
+let currentSessionName = '';
 
 // State
 let sessions = [];
@@ -167,6 +174,10 @@ function setupEventListeners() {
             closeModal();
         }
     });
+
+    // Copy/Download docs buttons
+    copyDocsBtn.addEventListener('click', copyDocs);
+    downloadDocsBtn.addEventListener('click', downloadDocs);
 }
 
 /**
@@ -462,6 +473,9 @@ async function viewSession(sessionId) {
     modalSessionTitle.textContent = 'Loading...';
     modalConversation.innerHTML = '<div class="ba-loading"><div class="ba-spinner"></div></div>';
     modalDocs.innerHTML = '<p style="color: var(--text-secondary);">Loading...</p>';
+    modalFooter.style.display = 'none';
+    currentSessionDocs = null;
+    currentSessionName = '';
     sessionModal.classList.add('active');
 
     try {
@@ -481,6 +495,7 @@ async function viewSession(sessionId) {
             title += ` - ${session.project_name}`;
         }
         modalSessionTitle.textContent = title;
+        currentSessionName = title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
 
         // Render conversation
         const conversation = session.conversation_history || [];
@@ -506,14 +521,20 @@ async function viewSession(sessionId) {
         // Render generated docs
         const docs = session.generated_docs;
         if (docs && (docs.all || docs.combined)) {
-            modalDocs.innerHTML = markdownToHtml(docs.all || docs.combined);
+            const docsContent = docs.all || docs.combined;
+            modalDocs.innerHTML = markdownToHtml(docsContent);
+            // Store docs for copy/download and show footer
+            currentSessionDocs = docsContent;
+            modalFooter.style.display = 'flex';
         } else {
             modalDocs.innerHTML = '<p style="color: var(--text-secondary);">Documents not yet generated</p>';
+            modalFooter.style.display = 'none';
         }
     } catch (error) {
         console.error('Error loading session:', error);
         modalConversation.innerHTML = '<p style="color: var(--text-secondary);">Failed to load session</p>';
         modalDocs.innerHTML = '';
+        modalFooter.style.display = 'none';
     }
 }
 
@@ -752,6 +773,48 @@ function escapeHtml(text) {
 }
 
 /**
+ * Copy docs to clipboard
+ */
+async function copyDocs() {
+    if (!currentSessionDocs) {
+        showToast('No documents to copy');
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(currentSessionDocs);
+        showToast('Copied to clipboard');
+    } catch (error) {
+        console.error('Copy error:', error);
+        showToast('Failed to copy');
+    }
+}
+
+/**
+ * Download docs as markdown file
+ */
+function downloadDocs() {
+    if (!currentSessionDocs) {
+        showToast('No documents to download');
+        return;
+    }
+
+    const filename = `requirements-${currentSessionName || 'session'}.md`;
+    const blob = new Blob([currentSessionDocs], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('Downloaded ' + filename);
+}
+
+/**
  * Show toast notification
  */
 function showToast(message) {
@@ -775,3 +838,5 @@ window.viewSession = viewSession;
 window.copyCode = copyCode;
 window.revokeCode = revokeCode;
 window.toggleSessionGroup = toggleSessionGroup;
+window.copyDocs = copyDocs;
+window.downloadDocs = downloadDocs;

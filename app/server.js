@@ -592,13 +592,31 @@ app.get('/api/share/:id', async (req, res) => {
     // Use best available text: final > personalized > raw
     const text = transcript.final_text || transcript.personalized_text || transcript.raw_text;
 
+    // Get owner info for "Add to Shared with Me" feature
+    let owner = null;
+    if (transcript.user_id) {
+      const { data: ownerData } = await database.supabase
+        .from('app_users')
+        .select('user_id, name, email')
+        .eq('user_id', transcript.user_id)
+        .single();
+
+      if (ownerData) {
+        owner = {
+          id: ownerData.user_id,
+          name: ownerData.name || ownerData.email?.split('@')[0] || 'Unknown'
+        };
+      }
+    }
+
     // Return only public fields
     res.json({
       id: transcript.id,
       title: transcript.title,
       text: text,
       audioUrl: transcript.audio_url,
-      createdAt: transcript.created_at
+      createdAt: transcript.created_at,
+      owner: owner
     });
   } catch (error) {
     console.error('Error fetching shared transcript:', error);
@@ -1849,6 +1867,326 @@ app.get('/api/ba/admin/unread-notes', async (req, res) => {
   } catch (error) {
     console.error('Error fetching unread notes:', error);
     res.status(500).json({ error: 'Failed to fetch unread notes' });
+  }
+});
+
+// ============================================
+// SAVED SHARES (Shared with Me) Endpoints
+// ============================================
+
+/**
+ * Get all saved shares for authenticated user
+ */
+app.get('/api/saved-shares', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+
+    if (!userId || userId === TEMP_USER_ID) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { data, error } = await database.supabase
+      .from('saved_shares')
+      .select(`
+        id,
+        recording_id,
+        owner_user_id,
+        owner_name,
+        saved_at,
+        transcripts:recording_id (
+          id,
+          title,
+          raw_text,
+          personalized_text,
+          final_text,
+          audio_url,
+          created_at
+        )
+      `)
+      .eq('saved_by_user_id', userId)
+      .order('saved_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching saved shares:', error);
+      return res.status(500).json({ error: 'Failed to fetch saved shares' });
+    }
+
+    // Filter out deleted recordings and flatten
+    const validShares = (data || []).filter(share => share.transcripts);
+    const shares = validShares.map(share => ({
+      id: share.id,
+      recording_id: share.recording_id,
+      owner_user_id: share.owner_user_id,
+      owner_name: share.owner_name,
+      saved_at: share.saved_at,
+      recording: share.transcripts
+    }));
+
+    res.json({ shares });
+  } catch (error) {
+    console.error('Error fetching saved shares:', error);
+    res.status(500).json({ error: 'Failed to fetch saved shares' });
+  }
+});
+
+/**
+ * Get saved shares grouped by person
+ */
+app.get('/api/saved-shares/by-person', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+
+    if (!userId || userId === TEMP_USER_ID) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { data, error } = await database.supabase
+      .from('saved_shares')
+      .select('owner_user_id, owner_name, saved_at')
+      .eq('saved_by_user_id', userId);
+
+    if (error) {
+      console.error('Error fetching saved shares by person:', error);
+      return res.status(500).json({ error: 'Failed to fetch saved shares' });
+    }
+
+    // Group by owner
+    const peopleMap = new Map();
+    for (const share of (data || [])) {
+      const key = share.owner_user_id || 'unknown';
+      if (!peopleMap.has(key)) {
+        peopleMap.set(key, {
+          owner_user_id: share.owner_user_id,
+          owner_name: share.owner_name || 'Unknown',
+          share_count: 0,
+          latest_saved_at: share.saved_at
+        });
+      }
+      const person = peopleMap.get(key);
+      person.share_count++;
+      if (new Date(share.saved_at) > new Date(person.latest_saved_at)) {
+        person.latest_saved_at = share.saved_at;
+      }
+    }
+
+    // Sort by latest_saved_at descending
+    const people = Array.from(peopleMap.values())
+      .sort((a, b) => new Date(b.latest_saved_at) - new Date(a.latest_saved_at));
+
+    res.json({ people });
+  } catch (error) {
+    console.error('Error fetching saved shares by person:', error);
+    res.status(500).json({ error: 'Failed to fetch saved shares' });
+  }
+});
+
+/**
+ * Get all shares from a specific person
+ */
+app.get('/api/saved-shares/person/:ownerUserId', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const ownerUserId = req.params.ownerUserId;
+
+    if (!userId || userId === TEMP_USER_ID) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { data, error } = await database.supabase
+      .from('saved_shares')
+      .select(`
+        id,
+        recording_id,
+        owner_user_id,
+        owner_name,
+        saved_at,
+        transcripts:recording_id (
+          id,
+          title,
+          raw_text,
+          personalized_text,
+          final_text,
+          audio_url,
+          created_at
+        )
+      `)
+      .eq('saved_by_user_id', userId)
+      .eq('owner_user_id', ownerUserId)
+      .order('saved_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching shares from person:', error);
+      return res.status(500).json({ error: 'Failed to fetch shares' });
+    }
+
+    // Filter out deleted recordings and flatten
+    const validShares = (data || []).filter(share => share.transcripts);
+    const shares = validShares.map(share => ({
+      id: share.id,
+      recording_id: share.recording_id,
+      owner_user_id: share.owner_user_id,
+      owner_name: share.owner_name,
+      saved_at: share.saved_at,
+      recording: share.transcripts
+    }));
+
+    const ownerName = shares.length > 0 ? shares[0].owner_name : 'Unknown';
+
+    res.json({ owner_name: ownerName, shares });
+  } catch (error) {
+    console.error('Error fetching shares from person:', error);
+    res.status(500).json({ error: 'Failed to fetch shares' });
+  }
+});
+
+/**
+ * Check if a recording is already saved
+ */
+app.get('/api/saved-shares/check/:recordingId', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const recordingId = req.params.recordingId;
+
+    if (!userId || userId === TEMP_USER_ID) {
+      return res.json({ saved: false, shareId: null });
+    }
+
+    const { data, error } = await database.supabase
+      .from('saved_shares')
+      .select('id')
+      .eq('recording_id', recordingId)
+      .eq('saved_by_user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error checking saved share:', error);
+      return res.status(500).json({ error: 'Failed to check saved status' });
+    }
+
+    res.json({
+      saved: !!data,
+      shareId: data?.id || null
+    });
+  } catch (error) {
+    console.error('Error checking saved share:', error);
+    res.status(500).json({ error: 'Failed to check saved status' });
+  }
+});
+
+/**
+ * Save a recording to user's Shared with Me
+ */
+app.post('/api/saved-shares', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const { recordingId } = req.body;
+
+    if (!userId || userId === TEMP_USER_ID) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (!recordingId) {
+      return res.status(400).json({ error: 'Recording ID is required' });
+    }
+
+    // Fetch the recording to get owner info
+    const transcript = await database.getTranscript(recordingId);
+
+    if (!transcript) {
+      return res.status(400).json({ error: 'Recording not found' });
+    }
+
+    // Check if trying to save own recording
+    if (transcript.user_id === userId) {
+      return res.status(400).json({
+        error: 'own_recording',
+        message: 'This is your own recording'
+      });
+    }
+
+    // Get owner's name
+    let ownerName = 'Unknown';
+    if (transcript.user_id) {
+      const { data: ownerData } = await database.supabase
+        .from('app_users')
+        .select('name, email')
+        .eq('user_id', transcript.user_id)
+        .single();
+
+      if (ownerData) {
+        ownerName = ownerData.name || ownerData.email?.split('@')[0] || 'Unknown';
+      }
+    }
+
+    // Check if already saved
+    const { data: existing } = await database.supabase
+      .from('saved_shares')
+      .select('id')
+      .eq('recording_id', recordingId)
+      .eq('saved_by_user_id', userId)
+      .single();
+
+    if (existing) {
+      return res.status(409).json({ error: 'Recording already saved' });
+    }
+
+    // Create the saved share
+    const { data, error } = await database.supabase
+      .from('saved_shares')
+      .insert({
+        recording_id: recordingId,
+        saved_by_user_id: userId,
+        owner_user_id: transcript.user_id,
+        owner_name: ownerName
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating saved share:', error);
+      return res.status(500).json({ error: 'Failed to save recording' });
+    }
+
+    res.status(201).json({
+      success: true,
+      share: {
+        id: data.id,
+        owner_name: ownerName
+      }
+    });
+  } catch (error) {
+    console.error('Error creating saved share:', error);
+    res.status(500).json({ error: 'Failed to save recording' });
+  }
+});
+
+/**
+ * Remove a saved share
+ */
+app.delete('/api/saved-shares/:id', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const shareId = req.params.id;
+
+    if (!userId || userId === TEMP_USER_ID) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { error } = await database.supabase
+      .from('saved_shares')
+      .delete()
+      .eq('id', shareId)
+      .eq('saved_by_user_id', userId);
+
+    if (error) {
+      console.error('Error deleting saved share:', error);
+      return res.status(500).json({ error: 'Failed to remove saved recording' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting saved share:', error);
+    res.status(500).json({ error: 'Failed to remove saved recording' });
   }
 });
 

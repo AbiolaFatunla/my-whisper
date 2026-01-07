@@ -695,6 +695,13 @@ const historyEmpty = document.getElementById('historyEmpty');
 const recordingsList = document.getElementById('recordingsList');
 const refreshBtn = document.getElementById('refreshBtn');
 
+// View Toggle Elements (Desktop)
+const recordingsSectionTitle = document.getElementById('recordingsSectionTitle');
+const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+const viewSharedBtn = document.getElementById('viewSharedBtn');
+const sharedEmpty = document.getElementById('sharedEmpty');
+const sharedSignInPrompt = document.getElementById('sharedSignInPrompt');
+
 // Player Modal Elements
 const playerModal = document.getElementById('playerModal');
 const playerTitle = document.getElementById('playerTitle');
@@ -713,6 +720,10 @@ const confirmDelete = document.getElementById('confirmDelete');
 let transcripts = [];
 let deleteTargetId = null;
 let modalTranscriptId = null;
+
+// View Toggle State (Desktop)
+let currentRecordingsView = 'history'; // 'history' or 'shared'
+let sharedRecordings = [];
 
 /**
  * Load transcripts from API
@@ -842,6 +853,8 @@ function renderHistory() {
 function showHistoryLoading() {
   if (historyLoading) historyLoading.style.display = 'block';
   if (historyEmpty) historyEmpty.style.display = 'none';
+  if (sharedEmpty) sharedEmpty.style.display = 'none';
+  if (sharedSignInPrompt) sharedSignInPrompt.style.display = 'none';
   if (recordingsList) recordingsList.style.display = 'none';
 }
 
@@ -851,6 +864,235 @@ function showHistoryLoading() {
 function showHistoryEmpty() {
   if (historyLoading) historyLoading.style.display = 'none';
   if (historyEmpty) historyEmpty.style.display = 'block';
+  if (sharedEmpty) sharedEmpty.style.display = 'none';
+  if (sharedSignInPrompt) sharedSignInPrompt.style.display = 'none';
+  if (recordingsList) recordingsList.style.display = 'none';
+}
+
+// ============================================
+// Shared Recordings (Desktop view toggle)
+// ============================================
+
+/**
+ * Switch between history and shared views
+ */
+function switchRecordingsView(view) {
+  if (!viewHistoryBtn || !viewSharedBtn) return;
+
+  currentRecordingsView = view;
+
+  // Update toggle button states
+  if (view === 'history') {
+    viewHistoryBtn.classList.add('active');
+    viewSharedBtn.classList.remove('active');
+    if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Your Recordings';
+    loadHistory();
+  } else {
+    viewHistoryBtn.classList.remove('active');
+    viewSharedBtn.classList.add('active');
+    if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Shared with Me';
+    loadSharedRecordings();
+  }
+}
+
+/**
+ * Load shared recordings from API
+ */
+async function loadSharedRecordings() {
+  if (!recordingsList) return;
+
+  // Check if user is authenticated
+  const user = auth.getUser();
+  if (!user) {
+    showSharedSignInPrompt();
+    return;
+  }
+
+  showHistoryLoading();
+
+  try {
+    const session = await auth.getSession();
+    const response = await fetch(`${config.apiUrl}/saved-shares`, {
+      headers: {
+        'Authorization': `Bearer ${session?.access_token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to load shared recordings');
+    }
+
+    const data = await response.json();
+    sharedRecordings = data.shares || [];
+
+    if (sharedRecordings.length === 0) {
+      showSharedEmpty();
+    } else {
+      renderSharedRecordings();
+    }
+  } catch (error) {
+    console.error('Error loading shared recordings:', error);
+    showSharedEmpty();
+  }
+}
+
+/**
+ * Render shared recordings list
+ */
+function renderSharedRecordings() {
+  if (!recordingsList) return;
+
+  historyLoading.style.display = 'none';
+  historyEmpty.style.display = 'none';
+  if (sharedEmpty) sharedEmpty.style.display = 'none';
+  if (sharedSignInPrompt) sharedSignInPrompt.style.display = 'none';
+  recordingsList.style.display = 'grid';
+
+  recordingsList.innerHTML = sharedRecordings.map(share => `
+    <div class="recording-item" data-id="${share.id}" data-recording-id="${share.recording_id}">
+      <div class="recording-info-group">
+        <div class="recording-from" style="font-size: 0.75rem; color: var(--primary); font-weight: 600; margin-bottom: 4px;">From ${escapeHtml(share.owner_name || 'Unknown')}</div>
+        <div class="recording-name">${escapeHtml(share.recording?.title || 'Untitled Recording')}</div>
+        <div class="recording-meta">
+          <span>${formatDate(share.saved_at)}</span>
+          <span>${truncateText(share.recording?.final_text || share.recording?.personalized_text || share.recording?.raw_text, 50)}</span>
+        </div>
+      </div>
+      <div class="recording-actions">
+        <button class="icon-button play-btn" data-id="${share.id}" aria-label="Play recording">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        </button>
+        <button class="icon-button copy-btn" data-id="${share.id}" aria-label="Copy transcription">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+        <button class="icon-button remove-btn" data-id="${share.id}" aria-label="Remove from saved">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  attachSharedRecordingsListeners();
+}
+
+/**
+ * Attach event listeners to shared recording items
+ */
+function attachSharedRecordingsListeners() {
+  recordingsList.querySelectorAll('.play-btn').forEach(btn => {
+    btn.addEventListener('click', () => openSharedPlayerModal(btn.dataset.id));
+  });
+
+  recordingsList.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => copySharedTranscript(btn.dataset.id));
+  });
+
+  recordingsList.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => removeSharedRecording(btn.dataset.id));
+  });
+}
+
+/**
+ * Open player modal for shared recording
+ */
+function openSharedPlayerModal(shareId) {
+  const share = sharedRecordings.find(s => s.id === shareId);
+  if (!share || !share.recording || !playerModal) return;
+
+  modalTranscriptId = null; // Can't edit shared recordings
+
+  playerTitle.textContent = share.recording.title || 'Recording';
+
+  const text = share.recording.final_text || share.recording.personalized_text || share.recording.raw_text || '';
+  modalTranscriptText.value = text;
+  modalTranscriptText.readOnly = true; // Can't edit shared recordings
+  if (saveModalTranscriptBtn) saveModalTranscriptBtn.style.display = 'none';
+
+  if (share.recording.audio_url) {
+    const audioUrl = `${config.apiUrl}/audio-proxy?url=${encodeURIComponent(share.recording.audio_url)}`;
+    audioPlayer.src = audioUrl;
+  }
+
+  playerModal.style.display = 'flex';
+}
+
+/**
+ * Copy transcript from shared recording
+ */
+async function copySharedTranscript(shareId) {
+  const share = sharedRecordings.find(s => s.id === shareId);
+  if (!share || !share.recording) return;
+
+  const text = share.recording.final_text || share.recording.personalized_text || share.recording.raw_text || '';
+
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Copied to clipboard');
+  } catch (e) {
+    showToast('Failed to copy', 'error');
+  }
+}
+
+/**
+ * Remove shared recording from saved
+ */
+async function removeSharedRecording(shareId) {
+  if (!confirm('Remove this recording from your Shared with Me list?')) return;
+
+  try {
+    const session = await auth.getSession();
+    const response = await fetch(`${config.apiUrl}/saved-shares/${shareId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${session?.access_token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to remove');
+    }
+
+    sharedRecordings = sharedRecordings.filter(s => s.id !== shareId);
+    showToast('Removed from Shared with Me');
+
+    if (sharedRecordings.length === 0) {
+      showSharedEmpty();
+    } else {
+      renderSharedRecordings();
+    }
+  } catch (error) {
+    console.error('Failed to remove shared recording:', error);
+    showToast('Failed to remove', 'error');
+  }
+}
+
+/**
+ * Show shared empty state
+ */
+function showSharedEmpty() {
+  if (historyLoading) historyLoading.style.display = 'none';
+  if (historyEmpty) historyEmpty.style.display = 'none';
+  if (sharedEmpty) sharedEmpty.style.display = 'block';
+  if (sharedSignInPrompt) sharedSignInPrompt.style.display = 'none';
+  if (recordingsList) recordingsList.style.display = 'none';
+}
+
+/**
+ * Show sign-in prompt for shared view
+ */
+function showSharedSignInPrompt() {
+  if (historyLoading) historyLoading.style.display = 'none';
+  if (historyEmpty) historyEmpty.style.display = 'none';
+  if (sharedEmpty) sharedEmpty.style.display = 'none';
+  if (sharedSignInPrompt) sharedSignInPrompt.style.display = 'block';
   if (recordingsList) recordingsList.style.display = 'none';
 }
 
@@ -875,7 +1117,9 @@ function openPlayerModal(id) {
   // Set transcript text - use final_text if available, then personalized_text, then raw_text
   if (modalTranscriptText) {
     modalTranscriptText.value = transcript.final_text || transcript.personalized_text || transcript.raw_text || '';
+    modalTranscriptText.readOnly = false; // Editable for own recordings
   }
+  if (saveModalTranscriptBtn) saveModalTranscriptBtn.style.display = 'block';
 
   playerModal.style.display = 'flex';
 }
@@ -1048,9 +1292,23 @@ async function handleConfirmDelete() {
  * Set up history event listeners
  */
 function setupHistoryEventListeners() {
-  // Refresh button
+  // View toggle buttons (Desktop)
+  if (viewHistoryBtn) {
+    viewHistoryBtn.addEventListener('click', () => switchRecordingsView('history'));
+  }
+  if (viewSharedBtn) {
+    viewSharedBtn.addEventListener('click', () => switchRecordingsView('shared'));
+  }
+
+  // Refresh button - refreshes current view
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', loadHistory);
+    refreshBtn.addEventListener('click', () => {
+      if (currentRecordingsView === 'shared') {
+        loadSharedRecordings();
+      } else {
+        loadHistory();
+      }
+    });
   }
 
   // Player modal

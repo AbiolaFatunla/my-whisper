@@ -804,7 +804,7 @@ async function handlePublicShare(id) {
   // Security: Only expose limited fields, not the full transcript record
   const { data, error } = await supabase
     .from('transcripts')
-    .select('id, title, raw_text, final_text, personalized_text, audio_url, created_at')
+    .select('id, title, raw_text, final_text, personalized_text, audio_url, created_at, user_id')
     .eq('id', id)
     .single();
 
@@ -815,12 +815,30 @@ async function handlePublicShare(id) {
   // Use best available text: final > personalized > raw
   const text = data.final_text || data.personalized_text || data.raw_text;
 
+  // Get owner info for "Add to Shared with Me" feature
+  let owner = null;
+  if (data.user_id) {
+    const { data: ownerData } = await supabase
+      .from('app_users')
+      .select('user_id, name, email')
+      .eq('user_id', data.user_id)
+      .single();
+
+    if (ownerData) {
+      owner = {
+        id: ownerData.user_id,
+        name: ownerData.name || ownerData.email?.split('@')[0] || 'Unknown'
+      };
+    }
+  }
+
   return jsonResponse(200, {
     id: data.id,
     title: data.title,
     text: text,
     audioUrl: data.audio_url,
-    createdAt: data.created_at
+    createdAt: data.created_at,
+    owner: owner
   });
 }
 
@@ -2115,6 +2133,293 @@ async function handleBATranscribe(body) {
   }
 }
 
+// ============================================
+// SAVED SHARES (Shared with Me) Handlers
+// ============================================
+
+/**
+ * Get all saved shares for the authenticated user
+ * GET /api/saved-shares
+ */
+async function handleGetSavedShares(queryParams, userId) {
+  if (!supabase) {
+    return errorResponse(500, 'Database not configured');
+  }
+
+  const { data, error } = await supabase
+    .from('saved_shares')
+    .select(`
+      id,
+      recording_id,
+      owner_user_id,
+      owner_name,
+      saved_at,
+      transcripts:recording_id (
+        id,
+        title,
+        raw_text,
+        personalized_text,
+        final_text,
+        audio_url,
+        created_at
+      )
+    `)
+    .eq('saved_by_user_id', userId)
+    .order('saved_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching saved shares:', error);
+    return errorResponse(500, 'Failed to fetch saved shares');
+  }
+
+  // Filter out any shares where the recording was deleted (transcripts is null)
+  const validShares = (data || []).filter(share => share.transcripts);
+
+  // Flatten the response
+  const shares = validShares.map(share => ({
+    id: share.id,
+    recording_id: share.recording_id,
+    owner_user_id: share.owner_user_id,
+    owner_name: share.owner_name,
+    saved_at: share.saved_at,
+    recording: share.transcripts
+  }));
+
+  return jsonResponse(200, { shares });
+}
+
+/**
+ * Get saved shares grouped by person
+ * GET /api/saved-shares/by-person
+ */
+async function handleGetSavedSharesByPerson(userId) {
+  if (!supabase) {
+    return errorResponse(500, 'Database not configured');
+  }
+
+  const { data, error } = await supabase
+    .from('saved_shares')
+    .select('owner_user_id, owner_name, saved_at')
+    .eq('saved_by_user_id', userId);
+
+  if (error) {
+    console.error('Error fetching saved shares by person:', error);
+    return errorResponse(500, 'Failed to fetch saved shares');
+  }
+
+  // Group by owner
+  const peopleMap = new Map();
+  for (const share of (data || [])) {
+    const key = share.owner_user_id || 'unknown';
+    if (!peopleMap.has(key)) {
+      peopleMap.set(key, {
+        owner_user_id: share.owner_user_id,
+        owner_name: share.owner_name || 'Unknown',
+        share_count: 0,
+        latest_saved_at: share.saved_at
+      });
+    }
+    const person = peopleMap.get(key);
+    person.share_count++;
+    if (new Date(share.saved_at) > new Date(person.latest_saved_at)) {
+      person.latest_saved_at = share.saved_at;
+    }
+  }
+
+  // Sort by latest_saved_at descending
+  const people = Array.from(peopleMap.values())
+    .sort((a, b) => new Date(b.latest_saved_at) - new Date(a.latest_saved_at));
+
+  return jsonResponse(200, { people });
+}
+
+/**
+ * Get all shares from a specific person
+ * GET /api/saved-shares/person/:userId
+ */
+async function handleGetSavedSharesFromPerson(ownerUserId, userId) {
+  if (!supabase) {
+    return errorResponse(500, 'Database not configured');
+  }
+
+  const { data, error } = await supabase
+    .from('saved_shares')
+    .select(`
+      id,
+      recording_id,
+      owner_user_id,
+      owner_name,
+      saved_at,
+      transcripts:recording_id (
+        id,
+        title,
+        raw_text,
+        personalized_text,
+        final_text,
+        audio_url,
+        created_at
+      )
+    `)
+    .eq('saved_by_user_id', userId)
+    .eq('owner_user_id', ownerUserId)
+    .order('saved_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching shares from person:', error);
+    return errorResponse(500, 'Failed to fetch shares');
+  }
+
+  // Filter out deleted recordings and flatten
+  const validShares = (data || []).filter(share => share.transcripts);
+  const shares = validShares.map(share => ({
+    id: share.id,
+    recording_id: share.recording_id,
+    owner_user_id: share.owner_user_id,
+    owner_name: share.owner_name,
+    saved_at: share.saved_at,
+    recording: share.transcripts
+  }));
+
+  const ownerName = shares.length > 0 ? shares[0].owner_name : 'Unknown';
+
+  return jsonResponse(200, { owner_name: ownerName, shares });
+}
+
+/**
+ * Save a recording to user's Shared with Me
+ * POST /api/saved-shares
+ */
+async function handleCreateSavedShare(body, userId) {
+  if (!supabase) {
+    return errorResponse(500, 'Database not configured');
+  }
+
+  const { recordingId } = body;
+
+  if (!recordingId) {
+    return errorResponse(400, 'Recording ID is required');
+  }
+
+  // Fetch the recording to get owner info
+  const { data: recording, error: recordingError } = await supabase
+    .from('transcripts')
+    .select('id, user_id, title')
+    .eq('id', recordingId)
+    .single();
+
+  if (recordingError || !recording) {
+    return errorResponse(400, 'Recording not found');
+  }
+
+  // Check if trying to save own recording
+  if (recording.user_id === userId) {
+    return jsonResponse(400, {
+      error: 'own_recording',
+      message: 'This is your own recording'
+    });
+  }
+
+  // Get owner's name from auth.users via app_users view
+  let ownerName = 'Unknown';
+  const { data: ownerData } = await supabase
+    .from('app_users')
+    .select('name, email')
+    .eq('user_id', recording.user_id)
+    .single();
+
+  if (ownerData) {
+    ownerName = ownerData.name || ownerData.email?.split('@')[0] || 'Unknown';
+  }
+
+  // Check if already saved
+  const { data: existing } = await supabase
+    .from('saved_shares')
+    .select('id')
+    .eq('recording_id', recordingId)
+    .eq('saved_by_user_id', userId)
+    .single();
+
+  if (existing) {
+    return errorResponse(409, 'Recording already saved');
+  }
+
+  // Create the saved share
+  const { data, error } = await supabase
+    .from('saved_shares')
+    .insert({
+      recording_id: recordingId,
+      saved_by_user_id: userId,
+      owner_user_id: recording.user_id,
+      owner_name: ownerName
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating saved share:', error);
+    return errorResponse(500, 'Failed to save recording');
+  }
+
+  return jsonResponse(201, {
+    success: true,
+    share: {
+      id: data.id,
+      owner_name: ownerName
+    }
+  });
+}
+
+/**
+ * Remove a saved share
+ * DELETE /api/saved-shares/:id
+ */
+async function handleDeleteSavedShare(shareId, userId) {
+  if (!supabase) {
+    return errorResponse(500, 'Database not configured');
+  }
+
+  const { error } = await supabase
+    .from('saved_shares')
+    .delete()
+    .eq('id', shareId)
+    .eq('saved_by_user_id', userId);
+
+  if (error) {
+    console.error('Error deleting saved share:', error);
+    return errorResponse(500, 'Failed to remove saved recording');
+  }
+
+  return jsonResponse(200, { success: true });
+}
+
+/**
+ * Check if a recording is already saved
+ * GET /api/saved-shares/check/:recordingId
+ */
+async function handleCheckSavedShare(recordingId, userId) {
+  if (!supabase) {
+    return errorResponse(500, 'Database not configured');
+  }
+
+  const { data, error } = await supabase
+    .from('saved_shares')
+    .select('id')
+    .eq('recording_id', recordingId)
+    .eq('saved_by_user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    // PGRST116 is "no rows returned" which is expected when not saved
+    console.error('Error checking saved share:', error);
+    return errorResponse(500, 'Failed to check saved status');
+  }
+
+  return jsonResponse(200, {
+    saved: !!data,
+    shareId: data?.id || null
+  });
+}
+
 // Main handler
 exports.handler = async (event) => {
   // Initialize clients on cold start
@@ -2305,6 +2610,40 @@ exports.handler = async (event) => {
     // GET /ba/admin/unread-notes
     if (path === '/ba/admin/unread-notes' && method === 'GET') {
       return await handleBAGetUnreadNotes(headers);
+    }
+
+    // ============================================
+    // SAVED SHARES (Shared with Me) Routes
+    // ============================================
+
+    if (path === '/saved-shares' && method === 'GET') {
+      return await handleGetSavedShares(queryParams, userId);
+    }
+
+    if (path === '/saved-shares' && method === 'POST') {
+      return await handleCreateSavedShare(body, userId);
+    }
+
+    if (path === '/saved-shares/by-person' && method === 'GET') {
+      return await handleGetSavedSharesByPerson(userId);
+    }
+
+    // Match /saved-shares/person/:userId
+    const savedSharesPersonMatch = path.match(/^\/saved-shares\/person\/([^\/]+)$/);
+    if (savedSharesPersonMatch && method === 'GET') {
+      return await handleGetSavedSharesFromPerson(savedSharesPersonMatch[1], userId);
+    }
+
+    // Match /saved-shares/check/:recordingId
+    const savedSharesCheckMatch = path.match(/^\/saved-shares\/check\/([^\/]+)$/);
+    if (savedSharesCheckMatch && method === 'GET') {
+      return await handleCheckSavedShare(savedSharesCheckMatch[1], userId);
+    }
+
+    // Match /saved-shares/:id for DELETE
+    const savedSharesIdMatch = path.match(/^\/saved-shares\/([^\/]+)$/);
+    if (savedSharesIdMatch && method === 'DELETE') {
+      return await handleDeleteSavedShare(savedSharesIdMatch[1], userId);
     }
 
     return errorResponse(404, 'Not found');

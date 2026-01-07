@@ -1017,6 +1017,52 @@ body::before {
   box-shadow: var(--shadow-lg), 0 0 30px rgba(249, 115, 22, 0.5);
 }
 
+/* Section Header Controls */
+.section-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* View Toggle (History/Shared) */
+.view-toggle {
+  display: flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  gap: 2px;
+}
+
+.view-toggle-btn {
+  background: transparent;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.view-toggle-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.view-toggle-btn.active {
+  background: var(--bg-gradient);
+  color: white;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+.view-toggle-btn.active:hover {
+  color: white;
+}
+
 /* Recordings List - Sleek Card Design */
 .recordings-list {
   display: grid;

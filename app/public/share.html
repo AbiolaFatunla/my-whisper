@@ -231,6 +231,20 @@
             font-weight: 500;
             box-shadow: var(--shadow-lg);
             z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .toast-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .toast-link:hover {
+            text-decoration: underline;
         }
 
         /* Save to Shared with Me button */
@@ -333,10 +347,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const pendingSave = urlParams.get('pendingSave');
 
-            console.log('checkPendingShareAdd:', { pendingSave, hasUser: !!currentUser, transcriptId });
-
             if (pendingSave === 'true' && currentUser && transcriptId) {
-                console.log('All conditions met - saving to Shared with Me');
                 // Clean up URL (remove pendingSave param)
                 urlParams.delete('pendingSave');
                 const cleanUrl = `${window.location.pathname}?${urlParams.toString()}`;
@@ -344,11 +355,6 @@
 
                 // Auto-save the recording
                 await saveToSharedWithMe(transcriptId, true);
-            } else if (pendingSave === 'true') {
-                console.log('pendingSave is true but conditions not met:', {
-                    currentUser: currentUser?.email || 'null',
-                    transcriptId
-                });
             }
         }
 
@@ -360,14 +366,11 @@
                 const { data: { session } } = await window.supabaseClient.auth.getSession();
                 currentUser = session?.user || null;
 
-                console.log('share.html initAuth - currentUser:', currentUser?.email || 'null');
-
                 // Check for pending share add after sign-in
                 await checkPendingShareAdd();
 
                 // Listen for auth changes (in case they sign in from this page)
                 window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                    console.log('share.html auth state changed:', event, session?.user?.email || 'no user');
                     currentUser = session?.user || null;
                     if (event === 'SIGNED_IN') {
                         await checkPendingShareAdd();
@@ -416,7 +419,7 @@
 
                 if (response.ok) {
                     isAlreadySaved = true;
-                    showToast('Added to Shared with Me');
+                    showToastWithLink('Added to Shared with Me', 'View in library →', '/shared.html');
                     await updateSaveButton();
                 } else if (data.error === 'own_recording') {
                     // User tried to save their own recording (edge case from deferred save)
@@ -665,6 +668,18 @@
             setTimeout(() => {
                 toast.style.display = 'none';
             }, 2000);
+        }
+
+        function showToastWithLink(message, linkText, linkUrl) {
+            const toast = document.getElementById('toast');
+            toast.innerHTML = `
+                <span>${escapeHtml(message)}</span>
+                <a href="${linkUrl}" class="toast-link">${escapeHtml(linkText)}</a>
+            `;
+            toast.style.display = 'flex';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 4000);
         }
 
         // Load the recording

@@ -516,7 +516,7 @@ function updateSortOptions(view) {
     sortSelect.innerHTML = `
       <option value="recent">Most Recent</option>
       <option value="count">Most Recordings</option>
-      <option value="name">A-Z (Name)</option>
+      <option value="name">A-Z</option>
     `;
     if (!['recent', 'count', 'name'].includes(currentValue)) {
       sortSelect.value = 'recent';
@@ -525,7 +525,7 @@ function updateSortOptions(view) {
     sortSelect.innerHTML = `
       <option value="newest">Newest</option>
       <option value="oldest">Oldest</option>
-      <option value="name">A-Z (Name)</option>
+      <option value="name">A-Z (Sharer)</option>
     `;
     if (!['newest', 'oldest', 'name'].includes(currentValue)) {
       sortSelect.value = 'newest';

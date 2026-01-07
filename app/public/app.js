@@ -78,7 +78,34 @@ async function init() {
   setupEventListeners();
   setupAuthEventListeners();
 
+  // Check for sign-in redirect request (from share.html deferred save flow)
+  checkSignInRedirect();
+
   console.log('App initialized');
+}
+
+/**
+ * Check for signIn=true parameter and handle redirect flow
+ * Used by share.html deferred save - redirects back after sign-in
+ */
+function checkSignInRedirect() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const signInRequested = urlParams.get('signIn');
+  const returnTo = urlParams.get('returnTo');
+
+  if (signInRequested === 'true' && returnTo) {
+    // Clean URL immediately
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    // If already signed in, redirect immediately
+    if (auth.getUser()) {
+      window.location.href = decodeURIComponent(returnTo);
+      return;
+    }
+
+    // Not signed in - trigger sign-in with returnTo as redirect
+    auth.signInWithGoogle(decodeURIComponent(returnTo));
+  }
 }
 
 /**
@@ -155,7 +182,7 @@ async function checkBAAccess() {
   if (!baSessionsBtn) return;
 
   try {
-    const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/user/sessions`);
+    const response = await auth.fetchWithAuth(`${config.apiUrl}/ba/user/sessions`);
 
     if (response.ok) {
       const data = await response.json();

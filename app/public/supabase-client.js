@@ -38,12 +38,13 @@ const auth = {
 
   /**
    * Sign in with Google
+   * @param {string} redirectUrl - Optional URL to redirect to after sign-in
    */
-  async signInWithGoogle() {
+  async signInWithGoogle(redirectUrl) {
     const { data, error } = await supabaseClient.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin
+        redirectTo: redirectUrl || window.location.origin
       }
     });
 

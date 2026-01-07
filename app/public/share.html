@@ -328,12 +328,19 @@
         let isAlreadySaved = false;
 
         // Check for pending share add (deferred save after sign-in)
+        // Uses URL param instead of localStorage to avoid tracking prevention issues
         async function checkPendingShareAdd() {
-            const pendingId = localStorage.getItem('pendingShareAdd');
-            if (pendingId && currentUser) {
-                localStorage.removeItem('pendingShareAdd');
+            const urlParams = new URLSearchParams(window.location.search);
+            const pendingSave = urlParams.get('pendingSave');
+
+            if (pendingSave === 'true' && currentUser && transcriptId) {
+                // Clean up URL (remove pendingSave param)
+                urlParams.delete('pendingSave');
+                const cleanUrl = `${window.location.pathname}?${urlParams.toString()}`;
+                window.history.replaceState({}, document.title, cleanUrl);
+
                 // Auto-save the recording
-                await saveToSharedWithMe(pendingId, true);
+                await saveToSharedWithMe(transcriptId, true);
             }
         }
 
@@ -418,10 +425,10 @@
         // Handle save button click
         async function handleSaveClick() {
             if (!currentUser) {
-                // Store pending save and redirect to sign-in
-                localStorage.setItem('pendingShareAdd', transcriptId);
-                // Redirect to main page for sign-in, then back here
-                const returnUrl = encodeURIComponent(window.location.href);
+                // Redirect to sign-in with pendingSave in URL (avoids localStorage tracking prevention issues)
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.set('pendingSave', 'true');
+                const returnUrl = encodeURIComponent(currentUrl.toString());
                 window.location.href = `/?signIn=true&returnTo=${returnUrl}`;
                 return;
             }

@@ -290,7 +290,7 @@ body::before {
   margin-left: 48px;
   font-size: 0.96rem;
   font-weight: 600;
-  color: var(--header-text-secondary);
+  color: var(--header-text);
   line-height: 1.65;
   text-wrap: balance;
   border-radius: var(--radius-full);

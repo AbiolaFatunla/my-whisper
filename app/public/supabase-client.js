@@ -188,6 +188,7 @@ async function authFetch(url, options = {}) {
 }
 
 // Export for use in other scripts
+window.supabaseClient = supabaseClient;
 window.auth = auth;
 window.anonymousUser = anonymousUser;
 window.getEffectiveUserId = getEffectiveUserId;

@@ -182,7 +182,7 @@ async function checkBAAccess() {
   if (!baSessionsBtn) return;
 
   try {
-    const response = await auth.fetchWithAuth(`${config.apiUrl}/ba/user/sessions`);
+    const response = await authFetch(`${config.apiUrl}/ba/user/sessions`);
 
     if (response.ok) {
       const data = await response.json();

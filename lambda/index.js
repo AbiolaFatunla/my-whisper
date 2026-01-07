@@ -920,7 +920,7 @@ async function handleSharePage(id) {
     <!-- Redirect to the full share page on Vercel -->
     <script>
         // Pass the transcript ID to the Vercel-hosted share page
-        window.location.href = 'https://my-whisper.vercel.app/share.html?id=${escapeHtml(id)}';
+        window.location.href = 'https://mywhisper.live/share.html?id=${escapeHtml(id)}';
     </script>
 
     <style>
@@ -946,7 +946,7 @@ async function handleSharePage(id) {
     <div class="loading">
         <h1>${escapeHtml(title)}</h1>
         <p>Loading recording...</p>
-        <p><a href="https://my-whisper.vercel.app/share.html?id=${escapeHtml(id)}">Click here if not redirected</a></p>
+        <p><a href="https://mywhisper.live/share.html?id=${escapeHtml(id)}">Click here if not redirected</a></p>
     </div>
 </body>
 </html>`;

@@ -95,6 +95,19 @@ class BAChatController {
     this.generatedDocs = null;
     this.currentTab = 'all';
 
+    // Notes panel elements
+    this.notesBtn = document.getElementById('notesBtn');
+    this.notesBadge = document.getElementById('notesBadge');
+    this.notesPanel = document.getElementById('notesPanel');
+    this.closeNotesPanel = document.getElementById('closeNotesPanel');
+    this.notesList = document.getElementById('notesList');
+    this.notesEmpty = document.getElementById('notesEmpty');
+    this.newNoteInput = document.getElementById('newNoteInput');
+    this.sendNoteBtn = document.getElementById('sendNoteBtn');
+
+    // Notes state
+    this.notes = [];
+
     // Section labels
     this.sectionLabels = {
       vision: 'Vision & Problem',
@@ -107,7 +120,17 @@ class BAChatController {
   }
 
   async init() {
-    // Get session info from sessionStorage
+    // Check for session ID in URL query params (seamless access)
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionIdFromUrl = urlParams.get('session');
+
+    if (sessionIdFromUrl) {
+      // Seamless access: load session by ID
+      await this.initFromSessionId(sessionIdFromUrl);
+      return;
+    }
+
+    // Legacy flow: Get session info from sessionStorage
     this.accessCode = sessionStorage.getItem('ba_access_code');
     const isNewSession = sessionStorage.getItem('ba_new_session') === 'true';
     const existingSessionId = sessionStorage.getItem('ba_session_id');
@@ -145,6 +168,72 @@ class BAChatController {
       this.showToast('Maximum recording time reached (15 minutes)');
       this.stopRecording();
     };
+  }
+
+  /**
+   * Initialize from session ID (seamless access flow)
+   */
+  async initFromSessionId(sessionId) {
+    this.sessionId = sessionId;
+
+    // Setup event listeners and theme
+    this.setupEventListeners();
+    this.initTheme();
+
+    try {
+      // Ensure auth is initialized
+      await auth.init();
+
+      const user = auth.getUser();
+      if (!user) {
+        this.showToast('Please sign in to access this session');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Fetch session by ID (with auth)
+      const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/session/${sessionId}`);
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          this.showToast('You do not have access to this session');
+        } else if (response.status === 404) {
+          this.showToast('Session not found');
+        } else {
+          this.showToast('Failed to load session');
+        }
+        window.location.href = 'ba-sessions.html';
+        return;
+      }
+
+      const data = await response.json();
+      this.session = data.session;
+      this.accessCode = this.session.access_code;
+
+      // Update UI with session data
+      this.updateHeader();
+      this.conversationHistory = this.session.conversation_history || [];
+      this.coverageStatus = this.session.coverage_status || this.coverageStatus;
+
+      // Render existing conversation
+      this.renderConversationHistory();
+      this.updateProgress();
+
+      // Check if session has generated docs
+      if (this.session.generated_docs) {
+        this.generatedDocs = this.session.generated_docs;
+      }
+
+      // Set max duration callback
+      this.recorder.onMaxDurationReached = () => {
+        this.showToast('Maximum recording time reached (15 minutes)');
+        this.stopRecording();
+      };
+    } catch (error) {
+      console.error('Error loading session:', error);
+      this.showToast('Failed to load session');
+      window.location.href = 'ba-sessions.html';
+    }
   }
 
   setupEventListeners() {
@@ -229,6 +318,30 @@ class BAChatController {
     }
     if (this.newSessionBtn) {
       this.newSessionBtn.addEventListener('click', () => this.startNewSession());
+    }
+
+    // Notes panel handlers
+    if (this.notesBtn) {
+      this.notesBtn.addEventListener('click', () => this.openNotesPanel());
+    }
+    if (this.closeNotesPanel) {
+      this.closeNotesPanel.addEventListener('click', () => this.closeNotesPanelFn());
+    }
+    if (this.notesPanel) {
+      this.notesPanel.addEventListener('click', (e) => {
+        if (e.target === this.notesPanel) this.closeNotesPanelFn();
+      });
+    }
+    if (this.sendNoteBtn) {
+      this.sendNoteBtn.addEventListener('click', () => this.sendNote());
+    }
+    if (this.newNoteInput) {
+      this.newNoteInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.sendNote();
+        }
+      });
     }
   }
 
@@ -986,6 +1099,133 @@ class BAChatController {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // ===== NOTES METHODS =====
+
+  async openNotesPanel() {
+    if (!this.notesPanel || !this.sessionId) return;
+
+    this.notesPanel.classList.add('active');
+    await this.loadNotes();
+    await this.markNotesAsRead();
+  }
+
+  closeNotesPanelFn() {
+    if (!this.notesPanel) return;
+    this.notesPanel.classList.remove('active');
+  }
+
+  async loadNotes() {
+    if (!this.sessionId) return;
+
+    try {
+      const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/sessions/${this.sessionId}/notes`);
+
+      if (response.ok) {
+        const data = await response.json();
+        this.notes = data.notes || [];
+        this.renderNotes();
+        this.updateNotesBadge();
+      }
+    } catch (error) {
+      console.error('Error loading notes:', error);
+    }
+  }
+
+  renderNotes() {
+    if (!this.notesList || !this.notesEmpty) return;
+
+    if (this.notes.length === 0) {
+      this.notesList.style.display = 'none';
+      this.notesEmpty.style.display = 'flex';
+      return;
+    }
+
+    this.notesList.style.display = 'flex';
+    this.notesEmpty.style.display = 'none';
+
+    this.notesList.innerHTML = this.notes.map(note => {
+      const isAdmin = note.author_type === 'admin';
+      const time = new Date(note.created_at).toLocaleString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return `
+        <div class="ba-note ${isAdmin ? 'admin' : ''}">
+          <div class="ba-note-header">
+            <span class="ba-note-author">${this.escapeHtml(note.author_name || (isAdmin ? 'Abiola' : 'You'))}</span>
+            <span class="ba-note-time">${time}</span>
+          </div>
+          <div class="ba-note-content">${this.escapeHtml(note.content)}</div>
+        </div>
+      `;
+    }).join('');
+
+    // Scroll to bottom
+    const notesContent = this.notesPanel.querySelector('.ba-notes-content');
+    if (notesContent) {
+      notesContent.scrollTop = notesContent.scrollHeight;
+    }
+  }
+
+  async sendNote() {
+    if (!this.newNoteInput || !this.sendNoteBtn || !this.sessionId) return;
+
+    const content = this.newNoteInput.value.trim();
+    if (!content) return;
+
+    this.sendNoteBtn.disabled = true;
+
+    try {
+      const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/sessions/${this.sessionId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
+
+      if (response.ok) {
+        this.newNoteInput.value = '';
+        await this.loadNotes();
+      } else {
+        this.showToast('Failed to send note');
+      }
+    } catch (error) {
+      console.error('Error sending note:', error);
+      this.showToast('Failed to send note');
+    } finally {
+      this.sendNoteBtn.disabled = false;
+    }
+  }
+
+  async markNotesAsRead() {
+    if (!this.sessionId) return;
+
+    try {
+      await auth.fetchWithAuth(`${API_BASE_URL}/ba/sessions/${this.sessionId}/notes/read`, {
+        method: 'PUT'
+      });
+      this.updateNotesBadge();
+    } catch (error) {
+      console.error('Error marking notes as read:', error);
+    }
+  }
+
+  updateNotesBadge() {
+    if (!this.notesBadge) return;
+
+    // Count unread notes (those not read by user, authored by admin)
+    const unreadCount = this.notes.filter(n => n.author_type === 'admin' && !n.read_by_user).length;
+
+    if (unreadCount > 0) {
+      this.notesBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+      this.notesBadge.style.display = 'flex';
+    } else {
+      this.notesBadge.style.display = 'none';
+    }
   }
 }
 

@@ -1166,6 +1166,15 @@
                 <span class="ba-header-title" id="headerTitle">New Session</span>
             </div>
             <div class="ba-header-right">
+                <button class="ba-notes-btn" id="notesBtn" title="Project Notes">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <span class="ba-notes-badge" id="notesBadge" style="display: none;">0</span>
+                </button>
                 <button class="ba-generate-btn" id="generateBtn">Ready to generate</button>
                 <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                     <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1385,9 +1394,232 @@
         </div>
     </div>
 
+    <!-- Notes Panel (Slide-in) -->
+    <div class="ba-notes-overlay" id="notesPanel">
+        <div class="ba-notes-container">
+            <div class="ba-notes-header">
+                <h2>Project Notes</h2>
+                <button class="ba-modal-close" id="closeNotesPanel">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="ba-notes-content">
+                <div class="ba-notes-list" id="notesList">
+                    <!-- Notes will be inserted here -->
+                </div>
+                <div class="ba-notes-empty" id="notesEmpty">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <p>No notes yet</p>
+                    <small>Add a note to share feedback or questions with Abiola</small>
+                </div>
+            </div>
+            <div class="ba-notes-form">
+                <textarea id="newNoteInput" placeholder="Type your note here..." rows="3"></textarea>
+                <button class="ba-btn ba-btn-primary" id="sendNoteBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Notes Button */
+        .ba-notes-btn {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s;
+        }
+        .ba-notes-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+        .ba-notes-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--error, #ef4444);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            min-width: 16px;
+            height: 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
+        /* Notes Panel */
+        .ba-notes-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 200;
+        }
+        .ba-notes-overlay.active {
+            display: flex;
+            justify-content: flex-end;
+        }
+        .ba-notes-container {
+            width: 100%;
+            max-width: 420px;
+            height: 100%;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        .ba-notes-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .ba-notes-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .ba-notes-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .ba-notes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .ba-note {
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+        .ba-note.admin {
+            background: rgba(249, 115, 22, 0.08);
+            border-color: rgba(249, 115, 22, 0.2);
+        }
+        .ba-note-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .ba-note-author {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+        }
+        .ba-note.admin .ba-note-author {
+            color: var(--primary);
+        }
+        .ba-note-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .ba-note-content {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        .ba-notes-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 24px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        .ba-notes-empty svg {
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        .ba-notes-empty p {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .ba-notes-form {
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .ba-notes-form textarea {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            resize: none;
+            font-family: inherit;
+        }
+        .ba-notes-form textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .ba-notes-form .ba-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 16px;
+            background: var(--gradient-primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ba-notes-form .ba-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+        .ba-notes-form .ba-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+
     <script src="config.js"></script>
     <script src="recorder.js"></script>
     <script src="uploader.js"></script>
+    <script src="supabase-client.js"></script>
     <script src="ba-chat.js"></script>
 </body>
 </html>

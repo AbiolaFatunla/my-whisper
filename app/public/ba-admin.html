@@ -75,6 +75,24 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ba-unread-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: var(--error, #ef4444);
+            color: white;
+            -webkit-text-fill-color: white;
+            min-width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 6px;
         }
 
         .ba-admin-user {
@@ -418,6 +436,118 @@
         .ba-code-status.expired {
             background: rgba(239, 68, 68, 0.15);
             color: #ef4444;
+        }
+
+        /* User Cards */
+        .ba-user-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .ba-user-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .ba-user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .ba-user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+        }
+
+        .ba-user-details {
+            flex: 1;
+        }
+
+        .ba-user-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .ba-user-email {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .ba-user-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .ba-user-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: var(--radius-full);
+        }
+
+        .ba-user-badge.has-access {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+
+        .ba-user-badge.no-access {
+            background: rgba(156, 163, 175, 0.15);
+            color: #6b7280;
+        }
+
+        /* Grant Access Modal */
+        .ba-modal-small {
+            max-width: 420px;
+        }
+
+        .ba-grant-user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+        }
+
+        .ba-grant-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+        }
+
+        .ba-grant-user-details {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .ba-grant-user-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .ba-grant-user-email {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
         }
 
         /* Buttons */
@@ -888,7 +1018,10 @@
                         <path d="M19 12H5M12 19l-7-7 7-7"/>
                     </svg>
                 </a>
-                <h1 class="ba-admin-title">BA Admin Dashboard</h1>
+                <h1 class="ba-admin-title">
+                    BA Admin Dashboard
+                    <span class="ba-unread-badge" id="unreadNotesBadge" style="display: none;">0</span>
+                </h1>
             </div>
             <div class="ba-admin-user" id="adminUser" style="display: none;">
                 <img class="ba-admin-avatar" id="adminAvatar" src="" alt="Admin">
@@ -925,6 +1058,15 @@
                     </svg>
                     Sessions
                 </button>
+                <button class="ba-admin-tab" data-tab="users">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    Users
+                </button>
                 <button class="ba-admin-tab" data-tab="codes">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -960,6 +1102,36 @@
                     </svg>
                     <p>No sessions yet</p>
                     <small>Sessions will appear here when clients start using their access codes</small>
+                </div>
+            </div>
+
+            <!-- Users Panel -->
+            <div class="ba-admin-panel" id="usersPanel">
+                <div class="ba-section-header">
+                    <h2 class="ba-section-title">Registered Users</h2>
+                    <button class="ba-btn ba-btn-secondary ba-btn-sm" id="refreshUsersBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <div class="ba-loading" id="usersLoading">
+                    <div class="ba-spinner"></div>
+                    <span>Loading users...</span>
+                </div>
+
+                <div id="usersList"></div>
+
+                <div class="ba-empty-state" id="usersEmpty" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                    </svg>
+                    <p>No users yet</p>
+                    <small>Users who sign in will appear here</small>
                 </div>
             </div>
 
@@ -1059,6 +1231,40 @@
                     </svg>
                     Download .md
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grant Access Modal -->
+    <div class="ba-modal" id="grantAccessModal">
+        <div class="ba-modal-content ba-modal-small">
+            <div class="ba-modal-header">
+                <h2 class="ba-modal-title">Grant BA Access</h2>
+                <button class="ba-modal-close" id="closeGrantAccessModal">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="ba-modal-body">
+                <div class="ba-grant-user-info">
+                    <img class="ba-grant-avatar" id="grantUserAvatar" src="" alt="User avatar">
+                    <div class="ba-grant-user-details">
+                        <span class="ba-grant-user-name" id="grantUserName">User Name</span>
+                        <span class="ba-grant-user-email" id="grantUserEmail">user@email.com</span>
+                    </div>
+                </div>
+                <div class="ba-form-group">
+                    <label class="ba-form-label">Project Name</label>
+                    <input type="text" class="ba-form-input" id="grantProjectName" placeholder="My New Project" required>
+                    <span class="ba-form-hint">A name for this BA session</span>
+                </div>
+                <input type="hidden" id="grantUserId">
+            </div>
+            <div class="ba-modal-footer">
+                <button class="ba-btn ba-btn-secondary" id="cancelGrantAccessBtn">Cancel</button>
+                <button class="ba-btn ba-btn-primary" id="confirmGrantAccessBtn">Grant Access</button>
             </div>
         </div>
     </div>

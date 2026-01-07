@@ -1281,6 +1281,384 @@ async function handleBAGetSessionById(sessionId, headers) {
   return jsonResponse(200, { session: data });
 }
 
+/**
+ * List all authenticated users (admin only)
+ * GET /ba/admin/users
+ */
+async function handleBAGetUsers(headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  // Get users from the app_users view
+  const { data: users, error: usersError } = await supabase
+    .from('app_users')
+    .select('*');
+
+  if (usersError) {
+    console.error('Error fetching users:', usersError);
+    return errorResponse(500, 'Failed to fetch users');
+  }
+
+  // Get access codes to compute has_ba_access and active_sessions
+  const { data: accessCodes } = await supabase
+    .from('ba_access_codes')
+    .select('user_id, code, is_active');
+
+  const { data: sessions } = await supabase
+    .from('ba_sessions')
+    .select('access_code, status');
+
+  // Enrich user data
+  const enrichedUsers = (users || []).map(user => {
+    const userCodes = (accessCodes || []).filter(ac => ac.user_id === user.user_id && ac.is_active);
+    const userCodeSet = new Set(userCodes.map(ac => ac.code));
+    const userSessions = (sessions || []).filter(s => userCodeSet.has(s.access_code));
+
+    return {
+      ...user,
+      has_ba_access: userCodes.length > 0,
+      active_sessions: userSessions.length
+    };
+  });
+
+  return jsonResponse(200, { users: enrichedUsers });
+}
+
+/**
+ * Grant BA access to a user (admin only)
+ * POST /ba/admin/grant-access
+ */
+async function handleBAGrantAccess(body, headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  const { userId, projectName } = body;
+
+  if (!userId) {
+    return errorResponse(400, 'User ID is required');
+  }
+
+  if (!projectName) {
+    return errorResponse(400, 'Project name is required');
+  }
+
+  // Get user details for the code generation
+  const { data: user, error: userError } = await supabase
+    .from('app_users')
+    .select('name, email')
+    .eq('user_id', userId)
+    .single();
+
+  if (userError || !user) {
+    return errorResponse(404, 'User not found');
+  }
+
+  // Generate access code: FIRSTNAME-YYYYMMDD-HHMM
+  const firstName = (user.name || user.email.split('@')[0]).split(' ')[0].toUpperCase();
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const timeStr = now.toISOString().slice(11, 16).replace(':', '');
+  const code = `${firstName}-${dateStr}-${timeStr}`.toLowerCase();
+
+  // Create access code linked to user
+  const { data: accessCode, error: createError } = await supabase
+    .from('ba_access_codes')
+    .insert({
+      code,
+      client_name: user.name || user.email.split('@')[0],
+      project_name: projectName,
+      user_id: userId,
+      is_active: true
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error('Error creating access code:', createError);
+    return errorResponse(500, 'Failed to grant access');
+  }
+
+  return jsonResponse(201, { accessCode });
+}
+
+/**
+ * Update access code (admin only)
+ * PUT /ba/admin/access-codes/:code
+ */
+async function handleBAUpdateAccessCode(code, body, headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  const { projectName } = body;
+
+  const updateData = {};
+  if (projectName !== undefined) updateData.project_name = projectName;
+
+  if (Object.keys(updateData).length === 0) {
+    return errorResponse(400, 'No fields to update');
+  }
+
+  const { data, error } = await supabase
+    .from('ba_access_codes')
+    .update(updateData)
+    .eq('code', code)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating access code:', error);
+    return errorResponse(500, 'Failed to update access code');
+  }
+
+  return jsonResponse(200, { accessCode: data });
+}
+
+/**
+ * Get current user's BA sessions
+ * GET /ba/user/sessions
+ */
+async function handleBAGetUserSessions(userId) {
+  if (!userId) {
+    return errorResponse(401, 'Authentication required');
+  }
+
+  // Get access codes linked to this user
+  const { data: accessCodes, error: codesError } = await supabase
+    .from('ba_access_codes')
+    .select('code, project_name, is_active')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  if (codesError) {
+    console.error('Error fetching user access codes:', codesError);
+    return errorResponse(500, 'Failed to fetch sessions');
+  }
+
+  if (!accessCodes || accessCodes.length === 0) {
+    return jsonResponse(200, { sessions: [] });
+  }
+
+  // Get sessions for these access codes
+  const codes = accessCodes.map(ac => ac.code);
+  const { data: sessions, error: sessionsError } = await supabase
+    .from('ba_sessions')
+    .select('id, access_code, project_name, status, created_at, updated_at, coverage_status, generated_docs')
+    .in('access_code', codes)
+    .order('updated_at', { ascending: false });
+
+  if (sessionsError) {
+    console.error('Error fetching user sessions:', sessionsError);
+    return errorResponse(500, 'Failed to fetch sessions');
+  }
+
+  // Enrich sessions with project_name from access_code if not set
+  const codeToProject = {};
+  for (const ac of accessCodes) {
+    codeToProject[ac.code] = ac.project_name;
+  }
+
+  const enrichedSessions = (sessions || []).map(session => ({
+    id: session.id,
+    access_code: session.access_code,
+    project_name: session.project_name || codeToProject[session.access_code] || 'Untitled Project',
+    status: session.status,
+    coverage_status: session.coverage_status,
+    has_docs: !!session.generated_docs,
+    created_at: session.created_at,
+    updated_at: session.updated_at,
+    unread_notes: 0 // Will be populated in Phase 7C
+  }));
+
+  return jsonResponse(200, { sessions: enrichedSessions });
+}
+
+/**
+ * Get BA session by ID (for user direct access)
+ * GET /ba/session/:id
+ */
+async function handleBAGetSessionByIdForUser(sessionId, userId) {
+  // Get the session
+  const { data: session, error } = await supabase
+    .from('ba_sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .single();
+
+  if (error || !session) {
+    return errorResponse(404, 'Session not found');
+  }
+
+  // Verify user has access to this session via their access codes
+  const { data: accessCode } = await supabase
+    .from('ba_access_codes')
+    .select('code')
+    .eq('code', session.access_code)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .single();
+
+  if (!accessCode) {
+    return errorResponse(403, 'Access denied');
+  }
+
+  return jsonResponse(200, { session });
+}
+
+// ===== PROJECT NOTES HANDLERS =====
+
+/**
+ * Get notes for a session
+ * GET /ba/sessions/:id/notes
+ */
+async function handleBAGetNotes(sessionId, userId, headers) {
+  // Check if user has access to this session
+  const hasAccess = await checkSessionAccess(sessionId, userId, headers);
+  if (!hasAccess.allowed) {
+    return errorResponse(hasAccess.status, hasAccess.message);
+  }
+
+  const { data: notes, error } = await supabase
+    .from('ba_notes')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching notes:', error);
+    return errorResponse(500, 'Failed to fetch notes');
+  }
+
+  return jsonResponse(200, { notes: notes || [] });
+}
+
+/**
+ * Add a note to a session
+ * POST /ba/sessions/:id/notes
+ */
+async function handleBAAddNote(sessionId, body, userId, headers) {
+  const { content } = body;
+
+  if (!content || !content.trim()) {
+    return errorResponse(400, 'Content is required');
+  }
+
+  // Check if user has access to this session
+  const hasAccess = await checkSessionAccess(sessionId, userId, headers);
+  if (!hasAccess.allowed) {
+    return errorResponse(hasAccess.status, hasAccess.message);
+  }
+
+  const { data: note, error } = await supabase
+    .from('ba_notes')
+    .insert({
+      session_id: sessionId,
+      author_type: hasAccess.isAdmin ? 'admin' : 'user',
+      author_id: userId,
+      author_name: hasAccess.authorName,
+      content: content.trim(),
+      read_by_admin: hasAccess.isAdmin,
+      read_by_user: !hasAccess.isAdmin
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error adding note:', error);
+    return errorResponse(500, 'Failed to add note');
+  }
+
+  return jsonResponse(201, { note });
+}
+
+/**
+ * Mark all notes in session as read
+ * PUT /ba/sessions/:id/notes/read
+ */
+async function handleBAMarkNotesRead(sessionId, userId, headers) {
+  const adminCheck = isAdminUser(headers);
+  const field = adminCheck.isAdmin ? 'read_by_admin' : 'read_by_user';
+
+  const { error } = await supabase
+    .from('ba_notes')
+    .update({ [field]: true })
+    .eq('session_id', sessionId);
+
+  if (error) {
+    console.error('Error marking notes as read:', error);
+    return errorResponse(500, 'Failed to mark notes as read');
+  }
+
+  return jsonResponse(200, { success: true });
+}
+
+/**
+ * Get unread notes count for admin
+ * GET /ba/admin/unread-notes
+ */
+async function handleBAGetUnreadNotes(headers) {
+  const adminCheck = isAdminUser(headers);
+  if (!adminCheck.isAdmin) {
+    return errorResponse(401, 'Admin authentication required');
+  }
+
+  const { count, error } = await supabase
+    .from('ba_notes')
+    .select('*', { count: 'exact', head: true })
+    .eq('read_by_admin', false)
+    .eq('author_type', 'user');
+
+  if (error) {
+    console.error('Error fetching unread notes:', error);
+    return errorResponse(500, 'Failed to fetch unread notes');
+  }
+
+  return jsonResponse(200, { unread: count || 0 });
+}
+
+/**
+ * Helper: Check if user has access to a session
+ */
+async function checkSessionAccess(sessionId, userId, headers) {
+  const adminCheck = isAdminUser(headers);
+
+  // Admins have access to all sessions
+  if (adminCheck.isAdmin) {
+    return { allowed: true, isAdmin: true, authorName: 'Abiola (Admin)' };
+  }
+
+  // Get session and check user access
+  const { data: session } = await supabase
+    .from('ba_sessions')
+    .select('access_code')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session) {
+    return { allowed: false, status: 404, message: 'Session not found' };
+  }
+
+  // Check if user has this access code
+  const { data: accessCode } = await supabase
+    .from('ba_access_codes')
+    .select('code, client_name')
+    .eq('code', session.access_code)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .single();
+
+  if (!accessCode) {
+    return { allowed: false, status: 403, message: 'Access denied' };
+  }
+
+  return { allowed: true, isAdmin: false, authorName: accessCode.client_name };
+}
+
 // BA System prompt for the AI Business Analyst
 const BA_SYSTEM_PROMPT = `You are an expert Business Analyst embedded in My Whisper, helping users document their project vision so it can be built. You speak in a warm, direct, and substantive way. No corporate stiffness, no jargon. You're like a knowledgeable friend who happens to be really good at extracting requirements.
 
@@ -1882,6 +2260,51 @@ exports.handler = async (event) => {
     const baSessionIdMatch = path.match(/^\/ba\/admin\/sessions\/([^\/]+)$/);
     if (baSessionIdMatch && method === 'GET') {
       return await handleBAGetSessionById(baSessionIdMatch[1], headers);
+    }
+
+    // New Phase 7A routes
+    if (path === '/ba/admin/users' && method === 'GET') {
+      return await handleBAGetUsers(headers);
+    }
+
+    if (path === '/ba/admin/grant-access' && method === 'POST') {
+      return await handleBAGrantAccess(body, headers);
+    }
+
+    // Match /ba/admin/access-codes/:code for PUT
+    if (baAccessCodeMatch && method === 'PUT') {
+      return await handleBAUpdateAccessCode(baAccessCodeMatch[1], body, headers);
+    }
+
+    if (path === '/ba/user/sessions' && method === 'GET') {
+      return await handleBAGetUserSessions(userId);
+    }
+
+    // Match /ba/session/:id for user direct access
+    const baSessionDirectMatch = path.match(/^\/ba\/session\/([^\/]+)$/);
+    if (baSessionDirectMatch && method === 'GET') {
+      return await handleBAGetSessionByIdForUser(baSessionDirectMatch[1], userId);
+    }
+
+    // Project Notes routes
+    // GET /ba/sessions/:id/notes
+    const baNotesMatch = path.match(/^\/ba\/sessions\/([^\/]+)\/notes$/);
+    if (baNotesMatch && method === 'GET') {
+      return await handleBAGetNotes(baNotesMatch[1], userId, headers);
+    }
+    if (baNotesMatch && method === 'POST') {
+      return await handleBAAddNote(baNotesMatch[1], body, userId, headers);
+    }
+
+    // PUT /ba/sessions/:id/notes/read
+    const baNotesReadMatch = path.match(/^\/ba\/sessions\/([^\/]+)\/notes\/read$/);
+    if (baNotesReadMatch && method === 'PUT') {
+      return await handleBAMarkNotesRead(baNotesReadMatch[1], userId, headers);
+    }
+
+    // GET /ba/admin/unread-notes
+    if (path === '/ba/admin/unread-notes' && method === 'GET') {
+      return await handleBAGetUnreadNotes(headers);
     }
 
     return errorResponse(404, 'Not found');

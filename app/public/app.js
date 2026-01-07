@@ -18,6 +18,8 @@ const userAvatar = document.getElementById('userAvatar');
 const userName = document.getElementById('userName');
 const userEmail = document.getElementById('userEmail');
 const adminBtn = document.getElementById('adminBtn');
+const baSessionsBtn = document.getElementById('baSessionsBtn');
+const baSessionsBadge = document.getElementById('baSessionsBadge');
 
 // Admin email
 const ADMIN_EMAIL = 'ftnlabiola@gmail.com';
@@ -135,11 +137,55 @@ function updateAuthUI() {
     if (adminBtn) {
       adminBtn.style.display = user.email === ADMIN_EMAIL ? 'flex' : 'none';
     }
+    // Check for BA access and show BA Sessions button
+    checkBAAccess();
   } else {
     // User is not signed in (anonymous mode)
     if (signInBtn) signInBtn.style.display = 'flex';
     if (userMenu) userMenu.style.display = 'none';
     if (adminBtn) adminBtn.style.display = 'none';
+    if (baSessionsBtn) baSessionsBtn.style.display = 'none';
+  }
+}
+
+/**
+ * Check if user has BA access and update the BA Sessions button
+ */
+async function checkBAAccess() {
+  if (!baSessionsBtn) return;
+
+  try {
+    const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/user/sessions`);
+
+    if (response.ok) {
+      const data = await response.json();
+      const sessions = data.sessions || [];
+
+      if (sessions.length > 0) {
+        // User has BA access, show the button
+        baSessionsBtn.style.display = 'flex';
+
+        // Update badge with unread notes count (will be populated in Phase 7C)
+        const totalUnread = sessions.reduce((sum, s) => sum + (s.unread_notes || 0), 0);
+        if (baSessionsBadge) {
+          if (totalUnread > 0) {
+            baSessionsBadge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+            baSessionsBadge.style.display = 'flex';
+          } else {
+            baSessionsBadge.style.display = 'none';
+          }
+        }
+      } else {
+        // No BA access
+        baSessionsBtn.style.display = 'none';
+      }
+    } else {
+      // Error or unauthorized - hide the button
+      baSessionsBtn.style.display = 'none';
+    }
+  } catch (error) {
+    console.error('Error checking BA access:', error);
+    baSessionsBtn.style.display = 'none';
   }
 }
 

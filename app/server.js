@@ -1420,6 +1420,438 @@ app.get('/api/ba/admin/sessions/:id', async (req, res) => {
   }
 });
 
+// ============================================
+// Phase 7A: Seamless Access Endpoints
+// ============================================
+
+/**
+ * List all authenticated users (admin only)
+ */
+app.get('/api/ba/admin/users', async (req, res) => {
+  try {
+    const adminCheck = isAdminUser(req);
+    if (!adminCheck.isAdmin) {
+      return res.status(401).json({ error: 'Admin authentication required' });
+    }
+
+    // Get users from the app_users view
+    const { data: users, error: usersError } = await database.supabase
+      .from('app_users')
+      .select('*');
+
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+      return res.status(500).json({ error: 'Failed to fetch users' });
+    }
+
+    // Get access codes to compute has_ba_access and active_sessions
+    const { data: accessCodes } = await database.supabase
+      .from('ba_access_codes')
+      .select('user_id, code, is_active');
+
+    const { data: sessions } = await database.supabase
+      .from('ba_sessions')
+      .select('access_code, status');
+
+    // Enrich user data
+    const enrichedUsers = (users || []).map(user => {
+      const userCodes = (accessCodes || []).filter(ac => ac.user_id === user.user_id && ac.is_active);
+      const userCodeSet = new Set(userCodes.map(ac => ac.code));
+      const userSessions = (sessions || []).filter(s => userCodeSet.has(s.access_code));
+
+      return {
+        ...user,
+        has_ba_access: userCodes.length > 0,
+        active_sessions: userSessions.length
+      };
+    });
+
+    res.json({ users: enrichedUsers });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+/**
+ * Grant BA access to a user (admin only)
+ */
+app.post('/api/ba/admin/grant-access', async (req, res) => {
+  try {
+    const adminCheck = isAdminUser(req);
+    if (!adminCheck.isAdmin) {
+      return res.status(401).json({ error: 'Admin authentication required' });
+    }
+
+    const { userId, projectName } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (!projectName) {
+      return res.status(400).json({ error: 'Project name is required' });
+    }
+
+    // Get user details for the code generation
+    const { data: user, error: userError } = await database.supabase
+      .from('app_users')
+      .select('name, email')
+      .eq('user_id', userId)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Generate access code: FIRSTNAME-YYYYMMDD-HHMM
+    const firstName = (user.name || user.email.split('@')[0]).split(' ')[0].toUpperCase();
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const timeStr = now.toISOString().slice(11, 16).replace(':', '');
+    const code = `${firstName}-${dateStr}-${timeStr}`.toLowerCase();
+
+    // Create access code linked to user
+    const { data: accessCode, error: createError } = await database.supabase
+      .from('ba_access_codes')
+      .insert({
+        code,
+        client_name: user.name || user.email.split('@')[0],
+        project_name: projectName,
+        user_id: userId,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Error creating access code:', createError);
+      return res.status(500).json({ error: 'Failed to grant access' });
+    }
+
+    res.status(201).json({ accessCode });
+  } catch (error) {
+    console.error('Error granting access:', error);
+    res.status(500).json({ error: 'Failed to grant access' });
+  }
+});
+
+/**
+ * Update access code (admin only)
+ */
+app.put('/api/ba/admin/access-codes/:code', async (req, res) => {
+  try {
+    const adminCheck = isAdminUser(req);
+    if (!adminCheck.isAdmin) {
+      return res.status(401).json({ error: 'Admin authentication required' });
+    }
+
+    const { projectName } = req.body;
+
+    const updateData = {};
+    if (projectName !== undefined) updateData.project_name = projectName;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    const { data, error } = await database.supabase
+      .from('ba_access_codes')
+      .update(updateData)
+      .eq('code', req.params.code)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating access code:', error);
+      return res.status(500).json({ error: 'Failed to update access code' });
+    }
+
+    res.json({ accessCode: data });
+  } catch (error) {
+    console.error('Error updating access code:', error);
+    res.status(500).json({ error: 'Failed to update access code' });
+  }
+});
+
+/**
+ * Get current user's BA sessions
+ */
+app.get('/api/ba/user/sessions', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+
+    if (!userId || userId === TEMP_USER_ID) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Get access codes linked to this user
+    const { data: accessCodes, error: codesError } = await database.supabase
+      .from('ba_access_codes')
+      .select('code, project_name, is_active')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    if (codesError) {
+      console.error('Error fetching user access codes:', codesError);
+      return res.status(500).json({ error: 'Failed to fetch sessions' });
+    }
+
+    if (!accessCodes || accessCodes.length === 0) {
+      return res.json({ sessions: [] });
+    }
+
+    // Get sessions for these access codes
+    const codes = accessCodes.map(ac => ac.code);
+    const { data: sessions, error: sessionsError } = await database.supabase
+      .from('ba_sessions')
+      .select('id, access_code, project_name, status, created_at, updated_at, coverage_status, generated_docs')
+      .in('access_code', codes)
+      .order('updated_at', { ascending: false });
+
+    if (sessionsError) {
+      console.error('Error fetching user sessions:', sessionsError);
+      return res.status(500).json({ error: 'Failed to fetch sessions' });
+    }
+
+    // Enrich sessions with project_name from access_code if not set
+    const codeToProject = {};
+    for (const ac of accessCodes) {
+      codeToProject[ac.code] = ac.project_name;
+    }
+
+    const enrichedSessions = (sessions || []).map(session => ({
+      id: session.id,
+      access_code: session.access_code,
+      project_name: session.project_name || codeToProject[session.access_code] || 'Untitled Project',
+      status: session.status,
+      coverage_status: session.coverage_status,
+      has_docs: !!session.generated_docs,
+      created_at: session.created_at,
+      updated_at: session.updated_at,
+      unread_notes: 0 // Will be populated in Phase 7C
+    }));
+
+    res.json({ sessions: enrichedSessions });
+  } catch (error) {
+    console.error('Error fetching user sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
+});
+
+/**
+ * Get BA session by ID (for user direct access)
+ */
+app.get('/api/ba/session/:id', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const sessionId = req.params.id;
+
+    // Get the session
+    const { data: session, error } = await database.supabase
+      .from('ba_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+
+    if (error || !session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Verify user has access to this session via their access codes
+    const { data: accessCode } = await database.supabase
+      .from('ba_access_codes')
+      .select('code')
+      .eq('code', session.access_code)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (!accessCode) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    res.json({ session });
+  } catch (error) {
+    console.error('Error fetching session:', error);
+    res.status(500).json({ error: 'Failed to fetch session' });
+  }
+});
+
+// ============================================
+// Phase 7C: Project Notes Endpoints
+// ============================================
+
+/**
+ * Helper: Check if user has access to a session
+ */
+async function checkSessionAccess(sessionId, req) {
+  const adminCheck = isAdminUser(req);
+  const userId = getUserIdFromHeaders(req);
+
+  // Admins have access to all sessions
+  if (adminCheck.isAdmin) {
+    return { allowed: true, isAdmin: true, authorName: 'Abiola (Admin)' };
+  }
+
+  // Get session and check user access
+  const { data: session } = await database.supabase
+    .from('ba_sessions')
+    .select('access_code')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session) {
+    return { allowed: false, status: 404, message: 'Session not found' };
+  }
+
+  // Check if user has this access code
+  const { data: accessCode } = await database.supabase
+    .from('ba_access_codes')
+    .select('code, client_name')
+    .eq('code', session.access_code)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .single();
+
+  if (!accessCode) {
+    return { allowed: false, status: 403, message: 'Access denied' };
+  }
+
+  return { allowed: true, isAdmin: false, authorName: accessCode.client_name };
+}
+
+/**
+ * Get notes for a session
+ */
+app.get('/api/ba/sessions/:id/notes', async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const userId = getUserIdFromHeaders(req);
+
+    // Check access
+    const hasAccess = await checkSessionAccess(sessionId, req);
+    if (!hasAccess.allowed) {
+      return res.status(hasAccess.status).json({ error: hasAccess.message });
+    }
+
+    const { data: notes, error } = await database.supabase
+      .from('ba_notes')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching notes:', error);
+      return res.status(500).json({ error: 'Failed to fetch notes' });
+    }
+
+    res.json({ notes: notes || [] });
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+    res.status(500).json({ error: 'Failed to fetch notes' });
+  }
+});
+
+/**
+ * Add a note to a session
+ */
+app.post('/api/ba/sessions/:id/notes', async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const userId = getUserIdFromHeaders(req);
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+
+    // Check access
+    const hasAccess = await checkSessionAccess(sessionId, req);
+    if (!hasAccess.allowed) {
+      return res.status(hasAccess.status).json({ error: hasAccess.message });
+    }
+
+    const { data: note, error } = await database.supabase
+      .from('ba_notes')
+      .insert({
+        session_id: sessionId,
+        author_type: hasAccess.isAdmin ? 'admin' : 'user',
+        author_id: userId,
+        author_name: hasAccess.authorName,
+        content: content.trim(),
+        read_by_admin: hasAccess.isAdmin,
+        read_by_user: !hasAccess.isAdmin
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding note:', error);
+      return res.status(500).json({ error: 'Failed to add note' });
+    }
+
+    res.status(201).json({ note });
+  } catch (error) {
+    console.error('Error adding note:', error);
+    res.status(500).json({ error: 'Failed to add note' });
+  }
+});
+
+/**
+ * Mark all notes in session as read
+ */
+app.put('/api/ba/sessions/:id/notes/read', async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const adminCheck = isAdminUser(req);
+    const field = adminCheck.isAdmin ? 'read_by_admin' : 'read_by_user';
+
+    const { error } = await database.supabase
+      .from('ba_notes')
+      .update({ [field]: true })
+      .eq('session_id', sessionId);
+
+    if (error) {
+      console.error('Error marking notes as read:', error);
+      return res.status(500).json({ error: 'Failed to mark notes as read' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking notes as read:', error);
+    res.status(500).json({ error: 'Failed to mark notes as read' });
+  }
+});
+
+/**
+ * Get unread notes count for admin
+ */
+app.get('/api/ba/admin/unread-notes', async (req, res) => {
+  try {
+    const adminCheck = isAdminUser(req);
+    if (!adminCheck.isAdmin) {
+      return res.status(401).json({ error: 'Admin authentication required' });
+    }
+
+    const { count, error } = await database.supabase
+      .from('ba_notes')
+      .select('*', { count: 'exact', head: true })
+      .eq('read_by_admin', false)
+      .eq('author_type', 'user');
+
+    if (error) {
+      console.error('Error fetching unread notes:', error);
+      return res.status(500).json({ error: 'Failed to fetch unread notes' });
+    }
+
+    res.json({ unread: count || 0 });
+  } catch (error) {
+    console.error('Error fetching unread notes:', error);
+    res.status(500).json({ error: 'Failed to fetch unread notes' });
+  }
+});
+
 // Start server (only when running directly, not in Lambda)
 if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
   app.listen(PORT, () => {

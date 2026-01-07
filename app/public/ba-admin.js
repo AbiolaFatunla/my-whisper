@@ -17,7 +17,25 @@ const adminEmail = document.getElementById('adminEmail');
 // Tab Elements
 const tabs = document.querySelectorAll('.ba-admin-tab');
 const sessionsPanel = document.getElementById('sessionsPanel');
+const usersPanel = document.getElementById('usersPanel');
 const codesPanel = document.getElementById('codesPanel');
+
+// Users Elements
+const usersLoading = document.getElementById('usersLoading');
+const usersList = document.getElementById('usersList');
+const usersEmpty = document.getElementById('usersEmpty');
+const refreshUsersBtn = document.getElementById('refreshUsersBtn');
+
+// Grant Access Modal Elements
+const grantAccessModal = document.getElementById('grantAccessModal');
+const closeGrantAccessModal = document.getElementById('closeGrantAccessModal');
+const grantUserAvatar = document.getElementById('grantUserAvatar');
+const grantUserName = document.getElementById('grantUserName');
+const grantUserEmail = document.getElementById('grantUserEmail');
+const grantUserId = document.getElementById('grantUserId');
+const grantProjectName = document.getElementById('grantProjectName');
+const cancelGrantAccessBtn = document.getElementById('cancelGrantAccessBtn');
+const confirmGrantAccessBtn = document.getElementById('confirmGrantAccessBtn');
 
 // Session Elements
 const sessionsLoading = document.getElementById('sessionsLoading');
@@ -56,6 +74,10 @@ let currentSessionName = '';
 // State
 let sessions = [];
 let accessCodes = [];
+let users = [];
+
+// Unread badge element
+const unreadNotesBadge = document.getElementById('unreadNotesBadge');
 
 /**
  * Initialize the admin dashboard
@@ -134,12 +156,14 @@ function showMainContent(user) {
 }
 
 /**
- * Load all data (sessions and access codes)
+ * Load all data (sessions, access codes, users, and unread notes)
  * Load access codes first so client names are available when rendering sessions
  */
 async function loadData() {
     await loadAccessCodes();
     await loadSessions();
+    await loadUsers();
+    await loadUnreadNotes();
 }
 
 /**
@@ -157,6 +181,27 @@ function setupEventListeners() {
     // Sessions
     refreshSessionsBtn.addEventListener('click', loadSessions);
 
+    // Users
+    if (refreshUsersBtn) {
+        refreshUsersBtn.addEventListener('click', loadUsers);
+    }
+
+    // Grant Access Modal
+    if (closeGrantAccessModal) {
+        closeGrantAccessModal.addEventListener('click', closeGrantModal);
+    }
+    if (cancelGrantAccessBtn) {
+        cancelGrantAccessBtn.addEventListener('click', closeGrantModal);
+    }
+    if (confirmGrantAccessBtn) {
+        confirmGrantAccessBtn.addEventListener('click', grantAccess);
+    }
+    if (grantAccessModal) {
+        grantAccessModal.addEventListener('click', (e) => {
+            if (e.target === grantAccessModal) closeGrantModal();
+        });
+    }
+
     // Access Codes
     newCodeBtn.addEventListener('click', showCreateForm);
     cancelCodeBtn.addEventListener('click', hideCreateForm);
@@ -168,10 +213,15 @@ function setupEventListeners() {
         if (e.target === sessionModal) closeModal();
     });
 
-    // Escape key to close modal
+    // Escape key to close modals
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && sessionModal.classList.contains('active')) {
-            closeModal();
+        if (e.key === 'Escape') {
+            if (sessionModal.classList.contains('active')) {
+                closeModal();
+            }
+            if (grantAccessModal && grantAccessModal.classList.contains('active')) {
+                closeGrantModal();
+            }
         }
     });
 
@@ -203,6 +253,7 @@ function switchTab(tabName) {
 
     // Update panels
     sessionsPanel.classList.toggle('active', tabName === 'sessions');
+    if (usersPanel) usersPanel.classList.toggle('active', tabName === 'users');
     codesPanel.classList.toggle('active', tabName === 'codes');
 }
 
@@ -554,6 +605,177 @@ function getAudioUrl(url) {
  */
 function closeModal() {
     sessionModal.classList.remove('active');
+}
+
+// ===== USERS FUNCTIONS =====
+
+/**
+ * Load users from API
+ */
+async function loadUsers() {
+    if (!usersLoading || !usersList || !usersEmpty) return;
+
+    usersLoading.style.display = 'flex';
+    usersList.innerHTML = '';
+    usersEmpty.style.display = 'none';
+
+    try {
+        const response = await authFetch(`${config.apiUrl}/ba/admin/users`);
+        const data = await response.json();
+
+        users = data.users || [];
+
+        if (users.length === 0) {
+            usersLoading.style.display = 'none';
+            usersEmpty.style.display = 'flex';
+        } else {
+            renderUsers();
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        usersLoading.style.display = 'none';
+        usersEmpty.style.display = 'flex';
+        showToast('Failed to load users');
+    }
+}
+
+/**
+ * Render users list
+ */
+function renderUsers() {
+    usersLoading.style.display = 'none';
+    usersList.innerHTML = '';
+
+    users.forEach(user => {
+        const card = document.createElement('div');
+        card.className = 'ba-user-card';
+
+        const lastSignIn = user.last_sign_in_at
+            ? new Date(user.last_sign_in_at).toLocaleDateString('en-GB', {
+                day: 'numeric', month: 'short', year: 'numeric'
+            })
+            : 'Never';
+
+        const hasAccess = user.has_ba_access;
+        const badgeClass = hasAccess ? 'has-access' : 'no-access';
+        const badgeText = hasAccess ? 'Has BA Access' : 'No Access';
+
+        card.innerHTML = `
+            <div class="ba-user-info">
+                <img class="ba-user-avatar" src="${escapeHtml(user.avatar_url || '')}" alt="${escapeHtml(user.name || 'User')}" onerror="this.style.display='none'">
+                <div class="ba-user-details">
+                    <span class="ba-user-name">${escapeHtml(user.name || 'Unknown')}</span>
+                    <span class="ba-user-email">${escapeHtml(user.email)}</span>
+                </div>
+            </div>
+            <div class="ba-user-meta">
+                <span>Last sign in: ${lastSignIn}</span>
+                <span class="ba-user-badge ${badgeClass}">${badgeText}</span>
+                ${hasAccess ? `<span>${user.active_sessions || 0} session${user.active_sessions !== 1 ? 's' : ''}</span>` : ''}
+            </div>
+            <button class="ba-btn ba-btn-primary ba-btn-sm" onclick="openGrantModal('${user.user_id}', '${escapeHtml(user.name || 'Unknown')}', '${escapeHtml(user.email)}', '${escapeHtml(user.avatar_url || '')}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Grant Access
+            </button>
+        `;
+
+        usersList.appendChild(card);
+    });
+}
+
+/**
+ * Open grant access modal
+ */
+function openGrantModal(userId, userName, userEmail, avatarUrl) {
+    if (!grantAccessModal) return;
+
+    grantUserId.value = userId;
+    grantUserName.textContent = userName;
+    grantUserEmail.textContent = userEmail;
+    grantUserAvatar.src = avatarUrl || '';
+    grantUserAvatar.style.display = avatarUrl ? 'block' : 'none';
+    grantProjectName.value = '';
+
+    grantAccessModal.classList.add('active');
+    grantProjectName.focus();
+}
+
+/**
+ * Close grant access modal
+ */
+function closeGrantModal() {
+    if (!grantAccessModal) return;
+    grantAccessModal.classList.remove('active');
+}
+
+/**
+ * Grant BA access to user
+ */
+async function grantAccess() {
+    const userId = grantUserId.value;
+    const projectName = grantProjectName.value.trim();
+
+    if (!projectName) {
+        showToast('Please enter a project name');
+        grantProjectName.focus();
+        return;
+    }
+
+    confirmGrantAccessBtn.disabled = true;
+    confirmGrantAccessBtn.textContent = 'Granting...';
+
+    try {
+        const response = await authFetch(`${config.apiUrl}/ba/admin/grant-access`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, projectName })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to grant access');
+        }
+
+        const data = await response.json();
+        showToast(`Access granted! Code: ${data.accessCode.code}`);
+        closeGrantModal();
+
+        // Reload data
+        await loadAccessCodes();
+        await loadUsers();
+    } catch (error) {
+        console.error('Error granting access:', error);
+        showToast(error.message || 'Failed to grant access');
+    } finally {
+        confirmGrantAccessBtn.disabled = false;
+        confirmGrantAccessBtn.textContent = 'Grant Access';
+    }
+}
+
+/**
+ * Load unread notes count
+ */
+async function loadUnreadNotes() {
+    if (!unreadNotesBadge) return;
+
+    try {
+        const response = await authFetch(`${config.apiUrl}/ba/admin/unread-notes`);
+        const data = await response.json();
+
+        const unread = data.unread || 0;
+
+        if (unread > 0) {
+            unreadNotesBadge.textContent = unread > 99 ? '99+' : unread;
+            unreadNotesBadge.style.display = 'flex';
+        } else {
+            unreadNotesBadge.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading unread notes:', error);
+    }
 }
 
 /**

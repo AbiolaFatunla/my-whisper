@@ -729,6 +729,11 @@ const viewSharedBtn = document.getElementById('viewSharedBtn');
 const sharedEmpty = document.getElementById('sharedEmpty');
 const sharedSignInPrompt = document.getElementById('sharedSignInPrompt');
 
+// Shared Filter Bar Elements (Desktop)
+const sharedFilterBar = document.getElementById('sharedFilterBar');
+const sharedViewSelect = document.getElementById('sharedViewSelect');
+const sharedSortSelect = document.getElementById('sharedSortSelect');
+
 // Player Modal Elements
 const playerModal = document.getElementById('playerModal');
 const playerTitle = document.getElementById('playerTitle');
@@ -751,6 +756,8 @@ let modalTranscriptId = null;
 // View Toggle State (Desktop)
 let currentRecordingsView = 'history'; // 'history' or 'shared'
 let sharedRecordings = [];
+let sharedPeople = [];
+let currentSharedViewMode = 'all'; // 'all' or 'by-person'
 
 /**
  * Load transcripts from API
@@ -913,6 +920,7 @@ function switchRecordingsView(view) {
     viewHistoryBtn.classList.add('active');
     viewSharedBtn.classList.remove('active');
     if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Your Recordings';
+    if (sharedFilterBar) sharedFilterBar.style.display = 'none';
     loadHistory();
   } else {
     viewHistoryBtn.classList.remove('active');
@@ -975,7 +983,24 @@ function renderSharedRecordings() {
   if (sharedSignInPrompt) sharedSignInPrompt.style.display = 'none';
   recordingsList.style.display = 'grid';
 
-  recordingsList.innerHTML = sharedRecordings.map(share => `
+  // Show filter bar and update sort options
+  if (sharedFilterBar) {
+    sharedFilterBar.style.display = 'flex';
+    updateSharedSortOptions();
+  }
+
+  // Get current view mode
+  const viewMode = sharedViewSelect?.value || 'all';
+
+  if (viewMode === 'by-person') {
+    renderSharedByPerson();
+    return;
+  }
+
+  // Sort recordings
+  const sortedShares = sortSharedRecordings([...sharedRecordings]);
+
+  recordingsList.innerHTML = sortedShares.map(share => `
     <div class="recording-item" data-id="${share.id}" data-recording-id="${share.recording_id}">
       <div class="recording-info-group">
         <div class="recording-from" style="font-size: 0.75rem; color: var(--primary); font-weight: 600; margin-bottom: 4px;">From ${escapeHtml(share.owner_name || 'Unknown')}</div>
@@ -1008,6 +1033,113 @@ function renderSharedRecordings() {
   `).join('');
 
   attachSharedRecordingsListeners();
+}
+
+/**
+ * Update sort options based on view mode
+ */
+function updateSharedSortOptions() {
+  if (!sharedSortSelect) return;
+
+  const viewMode = sharedViewSelect?.value || 'all';
+  const currentValue = sharedSortSelect.value;
+
+  if (viewMode === 'by-person') {
+    sharedSortSelect.innerHTML = `
+      <option value="recent">Most Recent</option>
+      <option value="count">Most Recordings</option>
+      <option value="name">A-Z</option>
+    `;
+    if (!['recent', 'count', 'name'].includes(currentValue)) {
+      sharedSortSelect.value = 'recent';
+    }
+  } else {
+    sharedSortSelect.innerHTML = `
+      <option value="newest">Newest</option>
+      <option value="oldest">Oldest</option>
+      <option value="name">A-Z (Sharer)</option>
+    `;
+    if (!['newest', 'oldest', 'name'].includes(currentValue)) {
+      sharedSortSelect.value = 'newest';
+    }
+  }
+}
+
+/**
+ * Sort shared recordings
+ */
+function sortSharedRecordings(sharesArray) {
+  const sortBy = sharedSortSelect?.value || 'newest';
+
+  switch (sortBy) {
+    case 'newest':
+      return sharesArray.sort((a, b) => new Date(b.saved_at) - new Date(a.saved_at));
+    case 'oldest':
+      return sharesArray.sort((a, b) => new Date(a.saved_at) - new Date(b.saved_at));
+    case 'name':
+      return sharesArray.sort((a, b) => (a.owner_name || '').localeCompare(b.owner_name || ''));
+    default:
+      return sharesArray;
+  }
+}
+
+/**
+ * Render shared recordings grouped by person
+ */
+function renderSharedByPerson() {
+  // Group recordings by owner
+  const peopleMap = new Map();
+  sharedRecordings.forEach(share => {
+    const ownerId = share.owner_user_id || 'unknown';
+    if (!peopleMap.has(ownerId)) {
+      peopleMap.set(ownerId, {
+        owner_user_id: ownerId,
+        owner_name: share.owner_name || 'Unknown',
+        share_count: 0,
+        latest_saved_at: share.saved_at
+      });
+    }
+    const person = peopleMap.get(ownerId);
+    person.share_count++;
+    if (new Date(share.saved_at) > new Date(person.latest_saved_at)) {
+      person.latest_saved_at = share.saved_at;
+    }
+  });
+
+  sharedPeople = Array.from(peopleMap.values());
+
+  // Sort people
+  const sortBy = sharedSortSelect?.value || 'recent';
+  switch (sortBy) {
+    case 'recent':
+      sharedPeople.sort((a, b) => new Date(b.latest_saved_at) - new Date(a.latest_saved_at));
+      break;
+    case 'count':
+      sharedPeople.sort((a, b) => b.share_count - a.share_count);
+      break;
+    case 'name':
+      sharedPeople.sort((a, b) => (a.owner_name || '').localeCompare(b.owner_name || ''));
+      break;
+  }
+
+  recordingsList.innerHTML = sharedPeople.map(person => `
+    <div class="recording-item person-card" data-person-id="${person.owner_user_id}">
+      <div class="recording-info-group">
+        <div class="recording-name">${escapeHtml(person.owner_name)}</div>
+        <div class="recording-meta">
+          <span>${person.share_count} recording${person.share_count !== 1 ? 's' : ''}</span>
+          <span>Last shared ${formatDate(person.latest_saved_at)}</span>
+        </div>
+      </div>
+      <div class="recording-actions">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-secondary);">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </div>
+    </div>
+  `).join('');
+
+  // Note: Person drill-down not implemented in desktop view - users can use mobile shared.html for full functionality
 }
 
 /**
@@ -1110,6 +1242,7 @@ function showSharedEmpty() {
   if (sharedEmpty) sharedEmpty.style.display = 'block';
   if (sharedSignInPrompt) sharedSignInPrompt.style.display = 'none';
   if (recordingsList) recordingsList.style.display = 'none';
+  if (sharedFilterBar) sharedFilterBar.style.display = 'none';
 }
 
 /**
@@ -1121,6 +1254,7 @@ function showSharedSignInPrompt() {
   if (sharedEmpty) sharedEmpty.style.display = 'none';
   if (sharedSignInPrompt) sharedSignInPrompt.style.display = 'block';
   if (recordingsList) recordingsList.style.display = 'none';
+  if (sharedFilterBar) sharedFilterBar.style.display = 'none';
 }
 
 /**
@@ -1334,6 +1468,28 @@ function setupHistoryEventListeners() {
         loadSharedRecordings();
       } else {
         loadHistory();
+      }
+    });
+  }
+
+  // Shared filter dropdowns (Desktop)
+  if (sharedViewSelect) {
+    sharedViewSelect.addEventListener('change', () => {
+      currentSharedViewMode = sharedViewSelect.value;
+      updateSharedSortOptions();
+      if (currentSharedViewMode === 'by-person') {
+        renderSharedByPerson();
+      } else {
+        renderSharedRecordings();
+      }
+    });
+  }
+  if (sharedSortSelect) {
+    sharedSortSelect.addEventListener('change', () => {
+      if (currentSharedViewMode === 'by-person') {
+        renderSharedByPerson();
+      } else {
+        renderSharedRecordings();
       }
     });
   }

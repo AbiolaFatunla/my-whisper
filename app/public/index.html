@@ -304,6 +304,19 @@
                         <p class="empty-state-subtitle">When others share recordings with you, they'll appear here.</p>
                     </div>
 
+                    <!-- Filter Bar (Shared with Me view only) -->
+                    <div class="filter-bar" id="sharedFilterBar" style="display: none;">
+                        <select class="filter-select" id="sharedViewSelect">
+                            <option value="all">All</option>
+                            <option value="by-person">By Person</option>
+                        </select>
+                        <select class="filter-select" id="sharedSortSelect">
+                            <option value="newest">Newest</option>
+                            <option value="oldest">Oldest</option>
+                            <option value="name">A-Z (Sharer)</option>
+                        </select>
+                    </div>
+
                     <!-- Recordings List -->
                     <div class="recordings-list" id="recordingsList" style="display: none;"></div>
                 </div>

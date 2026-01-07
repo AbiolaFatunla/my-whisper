@@ -1073,7 +1073,7 @@ body::before {
 }
 
 .filter-select {
-  padding: 8px 12px;
+  padding: 8px 28px 8px 12px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-secondary);

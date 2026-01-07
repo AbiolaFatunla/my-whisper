@@ -333,7 +333,10 @@
             const urlParams = new URLSearchParams(window.location.search);
             const pendingSave = urlParams.get('pendingSave');
 
+            console.log('checkPendingShareAdd:', { pendingSave, hasUser: !!currentUser, transcriptId });
+
             if (pendingSave === 'true' && currentUser && transcriptId) {
+                console.log('All conditions met - saving to Shared with Me');
                 // Clean up URL (remove pendingSave param)
                 urlParams.delete('pendingSave');
                 const cleanUrl = `${window.location.pathname}?${urlParams.toString()}`;
@@ -341,20 +344,30 @@
 
                 // Auto-save the recording
                 await saveToSharedWithMe(transcriptId, true);
+            } else if (pendingSave === 'true') {
+                console.log('pendingSave is true but conditions not met:', {
+                    currentUser: currentUser?.email || 'null',
+                    transcriptId
+                });
             }
         }
 
         // Initialize auth state
         async function initAuth() {
             if (typeof supabase !== 'undefined' && window.supabaseClient) {
-                const { data: { user } } = await window.supabaseClient.auth.getUser();
-                currentUser = user;
+                // Use getSession() instead of getUser() - more reliable as it reads from localStorage
+                // getUser() makes a server call which can fail or return null during session restoration
+                const { data: { session } } = await window.supabaseClient.auth.getSession();
+                currentUser = session?.user || null;
+
+                console.log('share.html initAuth - currentUser:', currentUser?.email || 'null');
 
                 // Check for pending share add after sign-in
                 await checkPendingShareAdd();
 
                 // Listen for auth changes (in case they sign in from this page)
                 window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                    console.log('share.html auth state changed:', event, session?.user?.email || 'no user');
                     currentUser = session?.user || null;
                     if (event === 'SIGNED_IN') {
                         await checkPendingShareAdd();

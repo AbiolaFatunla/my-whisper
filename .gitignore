@@ -65,5 +65,7 @@ lambda-package.zip
 # Personal/internal docs (not for GitHub)
 LESSONS_LEARNED_CICD.md
 CLAUDE.md
+"CLAUDE copy.md"
 SETUP_BEFORE_BUILD.md
 progress.txt
+docs/

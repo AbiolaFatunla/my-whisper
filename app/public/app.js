@@ -1045,23 +1045,22 @@ function updateSharedSortOptions() {
   const currentValue = sharedSortSelect.value;
 
   if (viewMode === 'by-person') {
+    const validOptions = ['recent', 'count', 'name'];
     sharedSortSelect.innerHTML = `
       <option value="recent">Most Recent</option>
       <option value="count">Most Recordings</option>
       <option value="name">A-Z</option>
     `;
-    if (!['recent', 'count', 'name'].includes(currentValue)) {
-      sharedSortSelect.value = 'recent';
-    }
+    sharedSortSelect.value = validOptions.includes(currentValue) ? currentValue : 'recent';
   } else {
+    const validOptions = ['newest', 'oldest', 'recorded', 'name'];
     sharedSortSelect.innerHTML = `
-      <option value="newest">Newest</option>
-      <option value="oldest">Oldest</option>
+      <option value="newest">Newest Saved</option>
+      <option value="oldest">Oldest Saved</option>
+      <option value="recorded">Recording Date</option>
       <option value="name">A-Z (Sharer)</option>
     `;
-    if (!['newest', 'oldest', 'name'].includes(currentValue)) {
-      sharedSortSelect.value = 'newest';
-    }
+    sharedSortSelect.value = validOptions.includes(currentValue) ? currentValue : 'newest';
   }
 }
 
@@ -1076,6 +1075,8 @@ function sortSharedRecordings(sharesArray) {
       return sharesArray.sort((a, b) => new Date(b.saved_at) - new Date(a.saved_at));
     case 'oldest':
       return sharesArray.sort((a, b) => new Date(a.saved_at) - new Date(b.saved_at));
+    case 'recorded':
+      return sharesArray.sort((a, b) => new Date(b.recording?.created_at || 0) - new Date(a.recording?.created_at || 0));
     case 'name':
       return sharesArray.sort((a, b) => (a.owner_name || '').localeCompare(b.owner_name || ''));
     default:

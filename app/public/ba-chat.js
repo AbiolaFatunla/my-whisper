@@ -192,7 +192,7 @@ class BAChatController {
       }
 
       // Fetch session by ID (with auth)
-      const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/session/${sessionId}`);
+      const response = await authFetch(`${config.apiUrl}/ba/session/${sessionId}`);
 
       if (!response.ok) {
         if (response.status === 403) {
@@ -211,13 +211,17 @@ class BAChatController {
       this.accessCode = this.session.access_code;
 
       // Update UI with session data
-      this.updateHeader();
       this.conversationHistory = this.session.conversation_history || [];
       this.coverageStatus = this.session.coverage_status || this.coverageStatus;
+      this.updateUI();
 
       // Render existing conversation
-      this.renderConversationHistory();
-      this.updateProgress();
+      this.renderMessages();
+
+      // Show greeting if this is a fresh session with no messages
+      if (this.conversationHistory.length === 0) {
+        this.addInitialMessage();
+      }
 
       // Check if session has generated docs
       if (this.session.generated_docs) {
@@ -1120,7 +1124,7 @@ class BAChatController {
     if (!this.sessionId) return;
 
     try {
-      const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/sessions/${this.sessionId}/notes`);
+      const response = await authFetch(`${config.apiUrl}/ba/sessions/${this.sessionId}/notes`);
 
       if (response.ok) {
         const data = await response.json();
@@ -1181,7 +1185,7 @@ class BAChatController {
     this.sendNoteBtn.disabled = true;
 
     try {
-      const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/sessions/${this.sessionId}/notes`, {
+      const response = await authFetch(`${config.apiUrl}/ba/sessions/${this.sessionId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })
@@ -1205,7 +1209,7 @@ class BAChatController {
     if (!this.sessionId) return;
 
     try {
-      await auth.fetchWithAuth(`${API_BASE_URL}/ba/sessions/${this.sessionId}/notes/read`, {
+      await authFetch(`${config.apiUrl}/ba/sessions/${this.sessionId}/notes/read`, {
         method: 'PUT'
       });
       this.updateNotesBadge();

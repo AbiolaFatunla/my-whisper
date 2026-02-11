@@ -111,7 +111,7 @@ async function loadSessions() {
   showLoading();
 
   try {
-    const response = await auth.fetchWithAuth(`${API_BASE_URL}/ba/user/sessions`);
+    const response = await authFetch(`${config.apiUrl}/ba/user/sessions`);
 
     if (!response.ok) {
       throw new Error('Failed to load sessions');

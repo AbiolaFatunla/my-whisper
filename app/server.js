@@ -1547,7 +1547,23 @@ app.post('/api/ba/admin/grant-access', async (req, res) => {
       return res.status(500).json({ error: 'Failed to grant access' });
     }
 
-    res.status(201).json({ accessCode });
+    // Also create a session so the user sees the BA button immediately
+    const { data: session, error: sessionError } = await database.supabase
+      .from('ba_sessions')
+      .insert({
+        access_code: code,
+        project_name: projectName,
+        conversation_history: [],
+        status: 'started'
+      })
+      .select()
+      .single();
+
+    if (sessionError) {
+      console.error('Error creating session:', sessionError);
+    }
+
+    res.status(201).json({ accessCode, session });
   } catch (error) {
     console.error('Error granting access:', error);
     res.status(500).json({ error: 'Failed to grant access' });

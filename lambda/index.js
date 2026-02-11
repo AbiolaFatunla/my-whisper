@@ -1400,7 +1400,23 @@ async function handleBAGrantAccess(body, headers) {
     return errorResponse(500, 'Failed to grant access');
   }
 
-  return jsonResponse(201, { accessCode });
+  // Also create a session so the user sees the BA button immediately
+  const { data: session, error: sessionError } = await supabase
+    .from('ba_sessions')
+    .insert({
+      access_code: code,
+      project_name: projectName,
+      conversation_history: [],
+      status: 'started'
+    })
+    .select()
+    .single();
+
+  if (sessionError) {
+    console.error('Error creating session:', sessionError);
+  }
+
+  return jsonResponse(201, { accessCode, session });
 }
 
 /**

@@ -963,36 +963,37 @@ async function handleSharePage(id) {
 
 async function handleAudioProxy(queryParams) {
   const url = queryParams?.url;
+  const key = queryParams?.key;
 
-  if (!url) {
-    return errorResponse(400, 'URL parameter is required');
+  if (!url && !key) {
+    return errorResponse(400, 'URL or key parameter is required');
   }
 
   try {
-    // Use S3 SDK for private bucket access (same as transcribe)
-    const audioBuffer = await downloadFromS3(url);
+    let bucket, s3Key;
 
-    // Determine content type from file extension
-    const ext = path.extname(url).toLowerCase();
-    const contentTypes = {
-      '.webm': 'audio/webm',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
-      '.ogg': 'audio/ogg',
-      '.m4a': 'audio/mp4'
-    };
-    const contentType = contentTypes[ext] || 'audio/webm';
+    if (key) {
+      bucket = BUCKET_NAME;
+      s3Key = key;
+    } else {
+      const s3Info = parseS3Url(url);
+      if (!s3Info) {
+        return errorResponse(400, 'Invalid S3 URL');
+      }
+      bucket = s3Info.bucket;
+      s3Key = s3Info.key;
+    }
 
-    const base64 = audioBuffer.toString('base64');
+    const command = new GetObjectCommand({ Bucket: bucket, Key: s3Key });
+    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
 
     return {
-      statusCode: 200,
+      statusCode: 302,
       headers: {
-        'Content-Type': contentType,
-        'Access-Control-Allow-Origin': '*'
+        'Location': presignedUrl,
+        'Cache-Control': 'no-cache'
       },
-      body: base64,
-      isBase64Encoded: true
+      body: ''
     };
   } catch (error) {
     console.error('Audio proxy error:', error);

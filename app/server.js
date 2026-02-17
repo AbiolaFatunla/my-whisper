@@ -629,34 +629,36 @@ app.get('/api/share/:id', async (req, res) => {
  */
 app.get('/api/audio-proxy', async (req, res) => {
   try {
-    const { url } = req.query;
-    if (!url) {
-      return res.status(400).json({ error: 'URL parameter is required' });
+    const { url, key } = req.query;
+    if (!url && !key) {
+      return res.status(400).json({ error: 'URL or key parameter is required' });
     }
 
-    const range = req.headers.range;
-    const fetchOptions = range ? { headers: { Range: range } } : {};
-    const response = await fetch(url, fetchOptions);
+    let bucket, s3Key;
 
-    if (!response.ok && response.status !== 206) {
-      return res.status(response.status).json({ error: 'Failed to fetch audio' });
+    if (key) {
+      bucket = BUCKET_NAME;
+      s3Key = key;
+    } else {
+      try {
+        const urlObj = new URL(url);
+        if (urlObj.hostname.includes('.s3.') && urlObj.hostname.endsWith('.amazonaws.com')) {
+          bucket = urlObj.hostname.split('.s3.')[0];
+          s3Key = urlObj.pathname.substring(1);
+        }
+      } catch (e) {
+        // Not a valid URL
+      }
+
+      if (!bucket || !s3Key) {
+        return res.status(400).json({ error: 'Invalid S3 URL' });
+      }
     }
 
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Content-Type', response.headers.get('content-type') || 'audio/webm');
+    const command = new GetObjectCommand({ Bucket: bucket, Key: s3Key });
+    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
 
-    const contentLength = response.headers.get('content-length');
-    const contentRange = response.headers.get('content-range');
-
-    if (contentLength) res.set('Content-Length', contentLength);
-    if (contentRange) {
-      res.set('Content-Range', contentRange);
-      res.status(206);
-    }
-    res.set('Accept-Ranges', 'bytes');
-
-    const buffer = await response.arrayBuffer();
-    res.send(Buffer.from(buffer));
+    res.redirect(presignedUrl);
   } catch (error) {
     console.error('Audio proxy error:', error);
     res.status(500).json({ error: 'Failed to proxy audio' });

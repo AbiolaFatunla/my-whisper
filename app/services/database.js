@@ -38,7 +38,7 @@ function generateId() {
 /**
  * Save a new transcript to the database
  */
-async function saveTranscript({ userId, rawText, personalizedText, audioUrl, durationSeconds, title }) {
+async function saveTranscript({ userId, rawText, personalizedText, audioUrl, durationSeconds, title, folderId, seriesId, seriesOrder, isDisposable }) {
   const client = initSupabase();
   if (!client) {
     throw new Error('Database not initialized');
@@ -46,20 +46,27 @@ async function saveTranscript({ userId, rawText, personalizedText, audioUrl, dur
 
   const id = generateId();
 
+  const insertData = {
+    id,
+    user_id: userId,
+    raw_text: rawText,
+    personalized_text: personalizedText || rawText,
+    final_text: null,
+    audio_url: audioUrl,
+    duration_seconds: durationSeconds,
+    title: title,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (folderId) insertData.folder_id = folderId;
+  if (seriesId) insertData.series_id = seriesId;
+  if (seriesOrder != null) insertData.series_order = seriesOrder;
+  if (isDisposable) insertData.is_disposable = true;
+
   const { data, error } = await client
     .from('transcripts')
-    .insert({
-      id,
-      user_id: userId,
-      raw_text: rawText,
-      personalized_text: personalizedText || rawText,
-      final_text: null,
-      audio_url: audioUrl,
-      duration_seconds: durationSeconds,
-      title: title,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
+    .insert(insertData)
     .select()
     .single();
 
@@ -313,6 +320,141 @@ async function personalizeText(userId, text, minCount = 2) {
   }
 }
 
+// ============================================
+// Folder Operations
+// ============================================
+
+async function getFolders(userId) {
+  const client = initSupabase();
+  if (!client) throw new Error('Database not initialized');
+
+  const { data, error } = await client
+    .from('folders')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function createFolder(userId, name) {
+  const client = initSupabase();
+  if (!client) throw new Error('Database not initialized');
+
+  const id = generateId();
+  const { data, error } = await client
+    .from('folders')
+    .insert({
+      id,
+      user_id: userId,
+      name: name.trim(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function updateFolder(userId, folderId, name) {
+  const client = initSupabase();
+  if (!client) throw new Error('Database not initialized');
+
+  const { data, error } = await client
+    .from('folders')
+    .update({ name: name.trim(), updated_at: new Date().toISOString() })
+    .eq('id', folderId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function deleteFolder(userId, folderId) {
+  const client = initSupabase();
+  if (!client) throw new Error('Database not initialized');
+
+  const { error } = await client
+    .from('folders')
+    .delete()
+    .eq('id', folderId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+  return true;
+}
+
+async function moveTranscriptToFolder(userId, transcriptId, folderId) {
+  const client = initSupabase();
+  if (!client) throw new Error('Database not initialized');
+
+  const { data, error } = await client
+    .from('transcripts')
+    .update({ folder_id: folderId, updated_at: new Date().toISOString() })
+    .eq('id', transcriptId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function setTranscriptSeries(userId, transcriptId, seriesId, seriesOrder) {
+  const client = initSupabase();
+  if (!client) throw new Error('Database not initialized');
+
+  const { data, error } = await client
+    .from('transcripts')
+    .update({
+      series_id: seriesId,
+      series_order: seriesOrder,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', transcriptId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function getNextSeriesOrder(userId, seriesId) {
+  const client = initSupabase();
+  if (!client) throw new Error('Database not initialized');
+
+  const { data, error } = await client
+    .from('transcripts')
+    .select('series_order')
+    .eq('user_id', userId)
+    .eq('series_id', seriesId)
+    .order('series_order', { ascending: false })
+    .limit(1);
+
+  if (error) throw error;
+  return (data && data.length > 0 ? data[0].series_order : 0) + 1;
+}
+
+async function deleteDisposableTranscripts(userId) {
+  const client = initSupabase();
+  if (!client) throw new Error('Database not initialized');
+
+  const { error } = await client
+    .from('transcripts')
+    .delete()
+    .eq('user_id', userId)
+    .eq('is_disposable', true);
+
+  if (error) throw error;
+  return true;
+}
+
 module.exports = {
   initSupabase,
   get supabase() { return supabase; },
@@ -324,5 +466,13 @@ module.exports = {
   deleteTranscript,
   getCorrections,
   saveCorrection,
-  personalizeText
+  personalizeText,
+  getFolders,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  moveTranscriptToFolder,
+  setTranscriptSeries,
+  getNextSeriesOrder,
+  deleteDisposableTranscripts
 };

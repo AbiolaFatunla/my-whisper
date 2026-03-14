@@ -2769,3 +2769,312 @@ select:focus-visible {
   }
 }
 
+/* ============================================
+   Recording Options (Folder selector + Disposable toggle)
+   ============================================ */
+
+.recording-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.folder-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.folder-select {
+  padding: 6px 12px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  background: var(--bg-card, rgba(255,255,255,0.82));
+  color: var(--text-primary, #1a1a1a);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.folder-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full, 50%);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  background: var(--bg-card, rgba(255,255,255,0.82));
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.folder-add-btn:hover {
+  background: var(--primary, #f97316);
+  color: white;
+  border-color: var(--primary, #f97316);
+}
+
+/* Disposable toggle */
+.disposable-toggle-wrapper,
+.series-toggle-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.disposable-toggle,
+.series-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  user-select: none;
+}
+
+.disposable-toggle input,
+.series-toggle input {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--border-color, rgba(0,0,0,0.2));
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.3s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.disposable-toggle input:checked + .toggle-slider,
+.series-toggle input:checked + .toggle-slider {
+  background: var(--primary, #f97316);
+}
+
+.disposable-toggle input:checked + .toggle-slider::after,
+.series-toggle input:checked + .toggle-slider::after {
+  transform: translateX(16px);
+}
+
+.toggle-label {
+  color: var(--text-secondary, #666);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.disposable-toggle input:checked ~ .toggle-label {
+  color: var(--primary, #f97316);
+  font-weight: 600;
+}
+
+/* Disposable mode record button indicator */
+.record-button.disposable-mode {
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.3);
+}
+
+/* Disposable badge on view toggle */
+.disposable-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--primary, #f97316);
+  color: white;
+  font-size: 0.625rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.view-toggle-btn {
+  position: relative;
+}
+
+/* Disposable actions bar */
+.disposable-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: rgba(249, 115, 22, 0.08);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+.disposable-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #666);
+  font-weight: 500;
+}
+
+.button-small {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+}
+
+/* Folder filter bar */
+.folder-filter-bar {
+  margin-bottom: 12px;
+}
+
+.folder-filter-bar .filter-select {
+  width: 100%;
+}
+
+/* Recording item folder/series badges */
+.recording-folder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.1);
+  color: var(--primary, #f97316);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.recording-series-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.recording-disposable-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.1);
+  color: var(--primary, #f97316);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.recording-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* Series group in folder view */
+.series-group {
+  border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.series-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.05);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.series-group-header:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.series-group-chevron {
+  transition: transform 0.2s;
+}
+
+.series-group.collapsed .series-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.series-group.collapsed .series-group-items {
+  display: none;
+}
+
+/* Move to folder dropdown in recording actions */
+.move-folder-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  min-width: 160px;
+  background: var(--bg-card, white);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 4px;
+}
+
+.move-folder-option {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--text-primary, #1a1a1a);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.move-folder-option:hover {
+  background: var(--bg-secondary, rgba(0,0,0,0.05));
+}
+
+.move-folder-option.active {
+  color: var(--primary, #f97316);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .recording-options {
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .folder-select {
+    min-width: 100px;
+    font-size: 0.75rem;
+  }
+
+  .toggle-label {
+    font-size: 0.75rem;
+  }
+}
+

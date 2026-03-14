@@ -300,7 +300,7 @@ app.post('/api/move-to-shared', async (req, res) => {
  */
 app.post('/api/transcribe', async (req, res) => {
   try {
-    const { fileUrl } = req.body;
+    const { fileUrl, folderId, seriesId, isDisposable } = req.body;
     const userId = getUserIdFromHeaders(req);
 
     if (!fileUrl) {
@@ -386,13 +386,23 @@ app.post('/api/transcribe', async (req, res) => {
     // Save to Supabase database
     let savedTranscript = null;
     try {
+      // Resolve series order if continuing a series
+      let resolvedSeriesOrder = null;
+      if (seriesId) {
+        resolvedSeriesOrder = await database.getNextSeriesOrder(userId, seriesId);
+      }
+
       savedTranscript = await database.saveTranscript({
         userId: userId,
         rawText: rawText,
         personalizedText: personalizedText,
         audioUrl: fileUrl,
         durationSeconds: null,
-        title: generatedTitle
+        title: generatedTitle,
+        folderId: folderId || null,
+        seriesId: seriesId || null,
+        seriesOrder: resolvedSeriesOrder,
+        isDisposable: isDisposable || false
       });
       console.log('✓ Transcript saved to database:', savedTranscript.id);
     } catch (dbError) {
@@ -465,6 +475,21 @@ app.put('/api/transcripts/:id', async (req, res) => {
 });
 
 /**
+ * Bulk delete all disposable notes
+ * NOTE: Must be defined before /api/transcripts/:id to avoid route conflict
+ */
+app.delete('/api/transcripts/disposable', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    await database.deleteDisposableTranscripts(userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting disposable notes:', error);
+    res.status(500).json({ error: 'Failed to delete disposable notes' });
+  }
+});
+
+/**
  * Delete transcript
  */
 app.delete('/api/transcripts/:id', async (req, res) => {
@@ -477,6 +502,116 @@ app.delete('/api/transcripts/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete transcript' });
   }
 });
+
+// ============================================
+// Folder Routes
+// ============================================
+
+/**
+ * Get all folders for user
+ */
+app.get('/api/folders', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const folders = await database.getFolders(userId);
+    res.json({ folders });
+  } catch (error) {
+    console.error('Error fetching folders:', error);
+    res.status(500).json({ error: 'Failed to fetch folders' });
+  }
+});
+
+/**
+ * Create a new folder
+ */
+app.post('/api/folders', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Folder name is required' });
+    }
+
+    const folder = await database.createFolder(userId, name);
+    res.json({ folder });
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    res.status(500).json({ error: 'Failed to create folder' });
+  }
+});
+
+/**
+ * Rename a folder
+ */
+app.put('/api/folders/:id', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Folder name is required' });
+    }
+
+    const folder = await database.updateFolder(userId, req.params.id, name);
+    res.json({ folder });
+  } catch (error) {
+    console.error('Error updating folder:', error);
+    res.status(500).json({ error: 'Failed to update folder' });
+  }
+});
+
+/**
+ * Delete a folder (recordings become unfiled)
+ */
+app.delete('/api/folders/:id', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    await database.deleteFolder(userId, req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    res.status(500).json({ error: 'Failed to delete folder' });
+  }
+});
+
+/**
+ * Move a transcript to a folder
+ */
+app.put('/api/transcripts/:id/move', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const { folderId } = req.body;
+    const transcript = await database.moveTranscriptToFolder(userId, req.params.id, folderId || null);
+    res.json({ transcript });
+  } catch (error) {
+    console.error('Error moving transcript:', error);
+    res.status(500).json({ error: 'Failed to move transcript' });
+  }
+});
+
+/**
+ * Link a transcript to a series
+ */
+app.post('/api/transcripts/:id/series', async (req, res) => {
+  try {
+    const userId = getUserIdFromHeaders(req);
+    const { seriesId } = req.body;
+
+    // Generate a new series ID if not provided (starting a new series)
+    const sid = seriesId || database.generateId();
+
+    // Get next order number
+    const seriesOrder = await database.getNextSeriesOrder(userId, sid);
+
+    const transcript = await database.setTranscriptSeries(userId, req.params.id, sid, seriesOrder);
+    res.json({ transcript, seriesId: sid });
+  } catch (error) {
+    console.error('Error setting series:', error);
+    res.status(500).json({ error: 'Failed to set series' });
+  }
+});
+
 
 /**
  * Escape HTML special characters

@@ -82,7 +82,7 @@ A **quick capture mode** for throwaway thoughts. Toggle it on, record, and the n
 - Still get transcribed and AI-titled (so you can scan them later)
 - Displayed in their own section/tab in history
 - **Bulk actions available:** "Empty All" button + individual delete + multi-select delete
-- No series linking in disposable mode (they're meant to be standalone quick captures)
+- Series linking is supported in disposable mode too — you can continue a series of quick thoughts
 
 **Toggle State:**
 - The toggle state persists during the session (localStorage) so you don't have to re-toggle between quick notes
@@ -126,4 +126,5 @@ ALTER TABLE transcripts ADD COLUMN is_disposable BOOLEAN DEFAULT FALSE;
 - **AI titles preserved:** Series recordings show `{AI Title} — Part N`, the AI title is never overridden
 - **Folders are optional:** No recording is forced into a folder; "Unfiled" is the default
 - **Disposable is a flag, not a folder:** Simpler implementation, avoids folder clutter, enables dedicated bulk-delete API
+- **Series works everywhere:** Series linking works in both regular folders and disposable notes
 - **Series uses a shared `series_id`:** All parts of a series share the same UUID, `series_order` determines sequence — simple and flexible

@@ -42,6 +42,8 @@ See `plan.md` for full design spec.
 - [x] Folder delete — trash icon appears next to folder dropdown, "type DELETE" confirmation
 - [x] Move recording to folder — folder icon button on every recording card, modal with folder picker
 - [x] "Type DELETE to confirm" pattern on all destructive actions (delete recording, delete folder, empty disposable)
+- [x] Multi-select mode — checkbox toggle button, click cards to select, floating action bar with Select All / Delete Selected / Cancel
+- [x] Bulk delete with "type DELETE" confirmation modal
 
 ## Remaining / Future
 

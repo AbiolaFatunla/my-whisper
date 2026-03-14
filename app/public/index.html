@@ -304,6 +304,12 @@
                                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                                 </svg>
                             </button>
+                            <button class="select-toggle-btn" id="selectModeBtn" aria-label="Select multiple recordings" title="Select multiple">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 11 12 14 22 4"></polyline>
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                </svg>
+                            </button>
                         </div>
                     </div>
 
@@ -572,6 +578,40 @@
             <div class="modal-actions">
                 <button class="button button-secondary" id="cancelMoveFolder">Cancel</button>
                 <button class="button button-primary" id="confirmMoveFolder">Move</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Bar (shown in select mode) -->
+    <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
+        <span class="bulk-count" id="bulkCount">0 selected</span>
+        <div class="bulk-actions-btns">
+            <button class="button button-secondary button-small" id="bulkSelectAll">Select All</button>
+            <button class="button button-danger button-small" id="bulkDeleteBtn">Delete Selected</button>
+            <button class="button button-secondary button-small" id="bulkCancelBtn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Bulk Delete Confirmation Modal -->
+    <div class="modal" id="bulkDeleteModal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Delete Selected Recordings?</h3>
+                <button class="close-button" id="closeBulkDelete" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <p style="margin-bottom: 16px; color: var(--text-secondary);" id="bulkDeleteMessage">
+                This will permanently delete the selected recordings.
+            </p>
+            <p class="confirm-label">Type <strong>DELETE</strong> to confirm:</p>
+            <input type="text" class="modal-input confirm-input" id="bulkDeleteConfirmInput" placeholder="Type DELETE" autocomplete="off" />
+            <div class="modal-actions">
+                <button class="button button-secondary" id="cancelBulkDelete">Cancel</button>
+                <button class="button button-danger" id="confirmBulkDelete" disabled>Delete</button>
             </div>
         </div>
     </div>

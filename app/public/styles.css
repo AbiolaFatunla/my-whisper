@@ -3040,6 +3040,118 @@ select:focus-visible {
   cursor: not-allowed;
 }
 
+/* Select mode toggle button */
+.select-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full, 50%);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.select-toggle-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.select-toggle-btn.active {
+  background: var(--primary, #f97316);
+  color: white;
+  border-color: var(--primary, #f97316);
+}
+
+/* Select mode checkbox on recording cards */
+.select-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.select-checkbox input {
+  display: none;
+}
+
+.select-checkbox .checkmark {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  background: var(--bg-card);
+}
+
+.select-checkbox input:checked + .checkmark {
+  background: var(--primary, #f97316);
+  border-color: var(--primary, #f97316);
+}
+
+.select-checkbox input:checked + .checkmark::after {
+  content: '';
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+
+/* Recording item in select mode */
+.recording-item.select-mode {
+  cursor: pointer;
+}
+
+.recording-item.select-mode .recording-actions {
+  display: none;
+}
+
+.recording-item.selected {
+  border-color: var(--primary, #f97316);
+  background: rgba(249, 115, 22, 0.05);
+}
+
+/* Bulk actions floating bar */
+.bulk-actions-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-xl, 0 20px 60px rgba(0,0,0,0.3));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+  animation: modalSlideIn 0.3s ease;
+}
+
+.bulk-count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.bulk-actions-btns {
+  display: flex;
+  gap: 8px;
+}
+
 /* Recording item folder/series badges */
 .recording-folder-badge {
   display: inline-flex;

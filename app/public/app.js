@@ -805,6 +805,8 @@ const confirmDelete = document.getElementById('confirmDelete');
 // History State
 let transcripts = [];
 let deleteTargetId = null;
+let selectMode = false;
+let selectedIds = new Set();
 let modalTranscriptId = null;
 
 // View Toggle State (Desktop)
@@ -925,7 +927,8 @@ function renderHistory() {
     }
 
     return `
-    <div class="recording-item" data-id="${transcript.id}">
+    <div class="recording-item${selectMode ? ' select-mode' : ''}${selectedIds.has(transcript.id) ? ' selected' : ''}" data-id="${transcript.id}">
+      ${selectMode ? `<label class="select-checkbox" data-id="${transcript.id}"><input type="checkbox" ${selectedIds.has(transcript.id) ? 'checked' : ''} /><span class="checkmark"></span></label>` : ''}
       <div class="recording-info-group">
         <div class="recording-name">${displayTitle}</div>
         ${badgesHtml}
@@ -992,6 +995,37 @@ function renderHistory() {
   recordingsList.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', () => openDeleteModal(btn.dataset.id));
   });
+
+  // Select mode checkboxes
+  recordingsList.querySelectorAll('.select-checkbox input').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const id = e.target.closest('.select-checkbox').dataset.id;
+      if (e.target.checked) {
+        selectedIds.add(id);
+      } else {
+        selectedIds.delete(id);
+      }
+      updateSelectUI();
+    });
+  });
+
+  // In select mode, clicking the card row toggles the checkbox
+  if (selectMode) {
+    recordingsList.querySelectorAll('.recording-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        // Don't toggle if clicking the checkbox itself
+        if (e.target.closest('.select-checkbox')) return;
+        const id = item.dataset.id;
+        if (selectedIds.has(id)) {
+          selectedIds.delete(id);
+        } else {
+          selectedIds.add(id);
+        }
+        updateSelectUI();
+        renderHistory();
+      });
+    });
+  }
 
   // Update disposable badge count
   updateDisposableBadge();
@@ -2122,6 +2156,114 @@ async function confirmMoveFolder() {
 // Folder Management Event Listeners
 // ============================================
 
+// ============================================
+// Multi-Select Mode
+// ============================================
+
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedIds.clear();
+
+  const btn = document.getElementById('selectModeBtn');
+  if (btn) btn.classList.toggle('active', selectMode);
+
+  updateSelectUI();
+  renderHistory();
+}
+
+function exitSelectMode() {
+  selectMode = false;
+  selectedIds.clear();
+
+  const btn = document.getElementById('selectModeBtn');
+  if (btn) btn.classList.remove('active');
+
+  updateSelectUI();
+  renderHistory();
+}
+
+function updateSelectUI() {
+  const bar = document.getElementById('bulkActionsBar');
+  const countEl = document.getElementById('bulkCount');
+
+  if (bar) bar.style.display = selectMode ? 'flex' : 'none';
+  if (countEl) countEl.textContent = `${selectedIds.size} selected`;
+
+  // Update card selected state without full re-render
+  document.querySelectorAll('.recording-item').forEach(item => {
+    const id = item.dataset.id;
+    const cb = item.querySelector('.select-checkbox input');
+    if (selectedIds.has(id)) {
+      item.classList.add('selected');
+      if (cb) cb.checked = true;
+    } else {
+      item.classList.remove('selected');
+      if (cb) cb.checked = false;
+    }
+  });
+}
+
+function bulkSelectAll() {
+  const recordingsList = document.getElementById('recordingsList');
+  if (!recordingsList) return;
+
+  recordingsList.querySelectorAll('.recording-item').forEach(item => {
+    selectedIds.add(item.dataset.id);
+  });
+  updateSelectUI();
+}
+
+function openBulkDeleteModal() {
+  if (selectedIds.size === 0) {
+    showToast('No recordings selected');
+    return;
+  }
+
+  const msg = document.getElementById('bulkDeleteMessage');
+  if (msg) msg.textContent = `This will permanently delete ${selectedIds.size} recording${selectedIds.size !== 1 ? 's' : ''}.`;
+
+  const confirmInput = document.getElementById('bulkDeleteConfirmInput');
+  const confirmBtn = document.getElementById('confirmBulkDelete');
+  if (confirmInput) confirmInput.value = '';
+  if (confirmBtn) confirmBtn.disabled = true;
+
+  const modal = document.getElementById('bulkDeleteModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeBulkDeleteModal() {
+  const modal = document.getElementById('bulkDeleteModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function confirmBulkDelete() {
+  const ids = [...selectedIds];
+  const count = ids.length;
+
+  try {
+    // Delete one by one (backend only supports single delete)
+    const results = await Promise.all(ids.map(id =>
+      authFetch(`${config.apiUrl}/transcripts/${id}`, { method: 'DELETE' })
+    ));
+
+    const failed = results.filter(r => !r.ok).length;
+
+    closeBulkDeleteModal();
+    exitSelectMode();
+
+    if (failed === 0) {
+      showToast(`Deleted ${count} recording${count !== 1 ? 's' : ''}`);
+    } else {
+      showToast(`Deleted ${count - failed} of ${count} recordings`);
+    }
+
+    await loadHistory();
+  } catch (error) {
+    console.error('Error bulk deleting:', error);
+    showToast('Failed to delete some recordings');
+  }
+}
+
 function setupFolderManagementListeners() {
   // Show/hide folder manage buttons when filter changes
   const folderFilterSelect = document.getElementById('folderFilterSelect');
@@ -2211,6 +2353,37 @@ function setupFolderManagementListeners() {
     emptyDisposableConfirmInput.addEventListener('input', () => {
       const confirmBtn = document.getElementById('confirmEmptyDisposable');
       if (confirmBtn) confirmBtn.disabled = emptyDisposableConfirmInput.value !== 'DELETE';
+    });
+  }
+
+  // Select mode
+  const selectModeBtn = document.getElementById('selectModeBtn');
+  if (selectModeBtn) selectModeBtn.addEventListener('click', toggleSelectMode);
+
+  const bulkSelectAllBtn = document.getElementById('bulkSelectAll');
+  if (bulkSelectAllBtn) bulkSelectAllBtn.addEventListener('click', bulkSelectAll);
+
+  const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+  if (bulkDeleteBtn) bulkDeleteBtn.addEventListener('click', openBulkDeleteModal);
+
+  const bulkCancelBtn = document.getElementById('bulkCancelBtn');
+  if (bulkCancelBtn) bulkCancelBtn.addEventListener('click', exitSelectMode);
+
+  // Bulk delete modal
+  const closeBulkDeleteBtn = document.getElementById('closeBulkDelete');
+  if (closeBulkDeleteBtn) closeBulkDeleteBtn.addEventListener('click', closeBulkDeleteModal);
+
+  const cancelBulkDeleteBtn = document.getElementById('cancelBulkDelete');
+  if (cancelBulkDeleteBtn) cancelBulkDeleteBtn.addEventListener('click', closeBulkDeleteModal);
+
+  const confirmBulkDeleteBtn = document.getElementById('confirmBulkDelete');
+  if (confirmBulkDeleteBtn) confirmBulkDeleteBtn.addEventListener('click', confirmBulkDelete);
+
+  const bulkDeleteConfirmInput = document.getElementById('bulkDeleteConfirmInput');
+  if (bulkDeleteConfirmInput) {
+    bulkDeleteConfirmInput.addEventListener('input', () => {
+      const confirmBtn = document.getElementById('confirmBulkDelete');
+      if (confirmBtn) confirmBtn.disabled = bulkDeleteConfirmInput.value !== 'DELETE';
     });
   }
 }

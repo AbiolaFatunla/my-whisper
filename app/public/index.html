@@ -128,6 +128,35 @@
                         <div class="recording-time" id="recordingTime">00:00</div>
                     </div>
 
+                    <!-- Recording Options (Folder selector + Disposable toggle) -->
+                    <div class="recording-options" id="recordingOptions">
+                        <div class="folder-selector" id="folderSelector">
+                            <select class="folder-select" id="folderSelect">
+                                <option value="">No Folder</option>
+                            </select>
+                            <button class="folder-add-btn" id="addFolderBtn" aria-label="Create new folder" title="New folder">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="disposable-toggle-wrapper">
+                            <label class="disposable-toggle" id="disposableToggle" title="Quick Note mode — recordings go to Disposable Notes">
+                                <input type="checkbox" id="disposableCheckbox">
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label">Quick Note</span>
+                            </label>
+                        </div>
+                        <div class="series-toggle-wrapper" id="seriesToggleWrapper" style="display: none;">
+                            <label class="series-toggle" title="Continue as next part in a series">
+                                <input type="checkbox" id="seriesCheckbox">
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label">Continue Series</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="record-button-shell">
                         <div class="record-button-ring"></div>
                         <button class="record-button" id="recordButton" aria-label="Start recording">
@@ -247,6 +276,18 @@
                                         <circle cx="12" cy="12" r="10"></circle>
                                     </svg>
                                 </button>
+                                <button class="view-toggle-btn" id="viewFoldersBtn" data-view="folders" aria-label="Folders">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                    </svg>
+                                </button>
+                                <button class="view-toggle-btn" id="viewDisposableBtn" data-view="disposable" aria-label="Disposable notes">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                    </svg>
+                                    <span class="disposable-badge" id="disposableBadge" style="display: none;">0</span>
+                                </button>
                                 <button class="view-toggle-btn" id="viewSharedBtn" data-view="shared" aria-label="Shared with me">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -263,6 +304,41 @@
                                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                                 </svg>
                             </button>
+                            <button class="select-toggle-btn" id="selectModeBtn" aria-label="Select multiple recordings" title="Select multiple">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 11 12 14 22 4"></polyline>
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Disposable Actions Bar -->
+                    <div class="disposable-actions-bar" id="disposableActionsBar" style="display: none;">
+                        <span class="disposable-count" id="disposableCount">0 disposable notes</span>
+                        <button class="button button-danger button-small" id="emptyDisposableBtn">Empty All</button>
+                    </div>
+
+                    <!-- Folder Filter (shown in folders view) -->
+                    <div class="folder-filter-bar" id="folderFilterBar" style="display: none;">
+                        <div class="folder-filter-row">
+                            <select class="filter-select" id="folderFilterSelect">
+                                <option value="all">All Folders</option>
+                            </select>
+                            <div class="folder-manage-btns" id="folderManageBtns" style="display: none;">
+                                <button class="folder-manage-btn" id="renameFolderBtn" aria-label="Rename folder" title="Rename folder">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </button>
+                                <button class="folder-manage-btn folder-manage-btn-danger" id="deleteFolderBtn" aria-label="Delete folder" title="Delete folder">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -378,10 +454,12 @@
                     </svg>
                 </button>
             </div>
-            <p style="margin-bottom: 24px; color: var(--text-secondary);">This action cannot be undone. The recording and transcription will be permanently deleted.</p>
+            <p style="margin-bottom: 16px; color: var(--text-secondary);">This action cannot be undone. The recording and transcription will be permanently deleted.</p>
+            <p class="confirm-label">Type <strong>DELETE</strong> to confirm:</p>
+            <input type="text" class="modal-input confirm-input" id="deleteConfirmInput" placeholder="Type DELETE" autocomplete="off" />
             <div class="modal-actions">
                 <button class="button button-secondary" id="cancelDelete">Cancel</button>
-                <button class="button button-danger" id="confirmDelete">Delete</button>
+                <button class="button button-danger" id="confirmDelete" disabled>Delete</button>
             </div>
         </div>
     </div>
@@ -410,6 +488,130 @@
                     </svg>
                     Sign in with Google
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Folder Modal -->
+    <div class="modal" id="renameFolderModal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Rename Folder</h3>
+                <button class="close-button" id="closeRenameFolder" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <input type="text" class="modal-input" id="renameFolderInput" placeholder="Folder name" maxlength="100" />
+            <div class="modal-actions">
+                <button class="button button-secondary" id="cancelRenameFolder">Cancel</button>
+                <button class="button button-primary" id="confirmRenameFolder">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Folder Confirmation Modal -->
+    <div class="modal" id="deleteFolderModal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Delete Folder?</h3>
+                <button class="close-button" id="closeDeleteFolder" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <p style="margin-bottom: 16px; color: var(--text-secondary);">
+                This will delete the folder. Recordings in this folder will become unfiled.
+            </p>
+            <p class="confirm-label">Type <strong>DELETE</strong> to confirm:</p>
+            <input type="text" class="modal-input confirm-input" id="deleteFolderConfirmInput" placeholder="Type DELETE" autocomplete="off" />
+            <div class="modal-actions">
+                <button class="button button-secondary" id="cancelDeleteFolder">Cancel</button>
+                <button class="button button-danger" id="confirmDeleteFolder" disabled>Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty Disposable Confirmation Modal -->
+    <div class="modal" id="emptyDisposableModal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Empty All Disposable Notes?</h3>
+                <button class="close-button" id="closeEmptyDisposable" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <p style="margin-bottom: 16px; color: var(--text-secondary);" id="emptyDisposableMessage">
+                This will permanently delete all disposable notes.
+            </p>
+            <p class="confirm-label">Type <strong>DELETE</strong> to confirm:</p>
+            <input type="text" class="modal-input confirm-input" id="emptyDisposableConfirmInput" placeholder="Type DELETE" autocomplete="off" />
+            <div class="modal-actions">
+                <button class="button button-secondary" id="cancelEmptyDisposable">Cancel</button>
+                <button class="button button-danger" id="confirmEmptyDisposable" disabled>Delete All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move to Folder Modal -->
+    <div class="modal" id="moveFolderModal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Move to Folder</h3>
+                <button class="close-button" id="closeMoveFolder" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <select class="filter-select modal-select" id="moveFolderSelect">
+                <option value="">No Folder (Unfiled)</option>
+            </select>
+            <div class="modal-actions">
+                <button class="button button-secondary" id="cancelMoveFolder">Cancel</button>
+                <button class="button button-primary" id="confirmMoveFolder">Move</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Bar (shown in select mode) -->
+    <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
+        <span class="bulk-count" id="bulkCount">0 selected</span>
+        <div class="bulk-actions-btns">
+            <button class="button button-secondary button-small" id="bulkSelectAll">Select All</button>
+            <button class="button button-danger button-small" id="bulkDeleteBtn">Delete Selected</button>
+            <button class="button button-secondary button-small" id="bulkCancelBtn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Bulk Delete Confirmation Modal -->
+    <div class="modal" id="bulkDeleteModal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Delete Selected Recordings?</h3>
+                <button class="close-button" id="closeBulkDelete" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <p style="margin-bottom: 16px; color: var(--text-secondary);" id="bulkDeleteMessage">
+                This will permanently delete the selected recordings.
+            </p>
+            <p class="confirm-label">Type <strong>DELETE</strong> to confirm:</p>
+            <input type="text" class="modal-input confirm-input" id="bulkDeleteConfirmInput" placeholder="Type DELETE" autocomplete="off" />
+            <div class="modal-actions">
+                <button class="button button-secondary" id="cancelBulkDelete">Cancel</button>
+                <button class="button button-danger" id="confirmBulkDelete" disabled>Delete</button>
             </div>
         </div>
     </div>

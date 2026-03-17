@@ -48,6 +48,13 @@ const saveTranscriptionBtn = document.getElementById('saveTranscriptionBtn');
 const copyTranscriptionBtn = document.getElementById('copyTranscriptionBtn');
 const downloadTranscriptionBtn = document.getElementById('downloadTranscriptionBtn');
 
+// Recording Options Elements
+const folderSelect = document.getElementById('folderSelect');
+const addFolderBtn = document.getElementById('addFolderBtn');
+const disposableCheckbox = document.getElementById('disposableCheckbox');
+const seriesCheckbox = document.getElementById('seriesCheckbox');
+const seriesToggleWrapper = document.getElementById('seriesToggleWrapper');
+
 // State
 let isRecording = false;
 let recordingTimer = null;
@@ -56,6 +63,11 @@ let currentTranscription = null;
 let currentRecordingUrl = null;
 let currentRecordingTitle = null;
 let currentTranscriptId = null;
+
+// Folder & Disposable State
+let folders = [];
+let lastRecordedSeriesId = null;
+let lastRecordedFolderId = null;
 
 /**
  * Initialize application
@@ -77,6 +89,17 @@ async function init() {
   // Set up event listeners
   setupEventListeners();
   setupAuthEventListeners();
+  setupRecordingOptionsListeners();
+
+  // Load folders
+  await loadFolders();
+
+  // Restore disposable toggle state from session
+  const savedDisposable = localStorage.getItem('disposableMode');
+  if (savedDisposable === 'true' && disposableCheckbox) {
+    disposableCheckbox.checked = true;
+    updateDisposableUI();
+  }
 
   // Check for sign-in redirect request (from share.html deferred save flow)
   checkSignInRedirect();
@@ -449,10 +472,29 @@ async function transcribeAudio(audioUrl) {
     hideUploadProgress();
     showTranscriptionLoading();
 
+    // Build transcription request with folder/series/disposable options
+    const transcribeBody = { fileUrl: audioUrl };
+
+    const isDisposable = disposableCheckbox && disposableCheckbox.checked;
+    if (isDisposable) {
+      transcribeBody.isDisposable = true;
+    } else {
+      // Only set folder if not in disposable mode
+      const selectedFolderId = folderSelect ? folderSelect.value : '';
+      if (selectedFolderId) {
+        transcribeBody.folderId = selectedFolderId;
+      }
+    }
+
+    // Continue series if toggled on
+    if (seriesCheckbox && seriesCheckbox.checked && lastRecordedSeriesId) {
+      transcribeBody.seriesId = lastRecordedSeriesId;
+    }
+
     const response = await authFetch(`${config.apiUrl}/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileUrl: audioUrl })
+      body: JSON.stringify(transcribeBody)
     });
 
     if (!response.ok) {
@@ -466,6 +508,18 @@ async function transcribeAudio(audioUrl) {
     currentTranscription = data.transcription;
     currentRecordingUrl = audioUrl;
     currentRecordingTitle = data.title;
+
+    // Track series for "continue series" feature
+    if (data.transcriptId) {
+      // If this recording is part of a series or we can start one
+      lastRecordedSeriesId = data.seriesId || null;
+      lastRecordedFolderId = data.folderId || (folderSelect ? folderSelect.value : null);
+
+      // Show series toggle if we just recorded something in a folder
+      if (seriesToggleWrapper && (lastRecordedFolderId || lastRecordedSeriesId)) {
+        seriesToggleWrapper.style.display = 'flex';
+      }
+    }
 
     // Show transcription
     showTranscription(data.transcription, data.title, data.transcriptId);
@@ -751,6 +805,8 @@ const confirmDelete = document.getElementById('confirmDelete');
 // History State
 let transcripts = [];
 let deleteTargetId = null;
+let selectMode = false;
+let selectedIds = new Set();
 let modalTranscriptId = null;
 
 // View Toggle State (Desktop)
@@ -777,11 +833,17 @@ async function loadHistory() {
     const data = await response.json();
     transcripts = data.transcripts || [];
 
+    // Refresh folders list
+    await loadFolders();
+
     if (transcripts.length === 0) {
       showHistoryEmpty();
     } else {
       renderHistory();
     }
+
+    // Update disposable badge
+    updateDisposableBadge();
 
     // Check for shared recording in URL after loading
     checkSharedRecordingUrl();
@@ -823,10 +885,53 @@ function renderHistory() {
   historyEmpty.style.display = 'none';
   recordingsList.style.display = 'grid';
 
-  recordingsList.innerHTML = transcripts.map(transcript => `
-    <div class="recording-item" data-id="${transcript.id}">
+  // Filter based on current view
+  let displayTranscripts = transcripts;
+  if (currentRecordingsView === 'disposable') {
+    displayTranscripts = transcripts.filter(t => t.is_disposable);
+  } else if (currentRecordingsView === 'folders') {
+    const selectedFolder = document.getElementById('folderFilterSelect')?.value;
+    if (selectedFolder && selectedFolder !== 'all') {
+      displayTranscripts = transcripts.filter(t => t.folder_id === selectedFolder);
+    } else {
+      displayTranscripts = transcripts.filter(t => !t.is_disposable);
+    }
+  } else if (currentRecordingsView === 'history') {
+    displayTranscripts = transcripts.filter(t => !t.is_disposable);
+  }
+
+  if (displayTranscripts.length === 0) {
+    showHistoryEmpty();
+    return;
+  }
+
+  recordingsList.innerHTML = displayTranscripts.map(transcript => {
+    // Build badges
+    let badges = '';
+    const folder = folders.find(f => f.id === transcript.folder_id);
+    if (folder) {
+      badges += `<span class="recording-folder-badge">${escapeHtml(folder.name)}</span>`;
+    }
+    if (transcript.series_order) {
+      badges += `<span class="recording-series-badge">Part ${transcript.series_order}</span>`;
+    }
+    if (transcript.is_disposable) {
+      badges += `<span class="recording-disposable-badge">Quick Note</span>`;
+    }
+    const badgesHtml = badges ? `<div class="recording-badges">${badges}</div>` : '';
+
+    // Build title with series part appended
+    let displayTitle = escapeHtml(transcript.title || 'Untitled Recording');
+    if (transcript.series_order) {
+      displayTitle += ` &mdash; Part ${transcript.series_order}`;
+    }
+
+    return `
+    <div class="recording-item${selectMode ? ' select-mode' : ''}${selectedIds.has(transcript.id) ? ' selected' : ''}" data-id="${transcript.id}">
+      ${selectMode ? `<label class="select-checkbox" data-id="${transcript.id}"><input type="checkbox" ${selectedIds.has(transcript.id) ? 'checked' : ''} /><span class="checkmark"></span></label>` : ''}
       <div class="recording-info-group">
-        <div class="recording-name">${escapeHtml(transcript.title || 'Untitled Recording')}</div>
+        <div class="recording-name">${displayTitle}</div>
+        ${badgesHtml}
         <div class="recording-meta">
           <span>${formatDate(transcript.created_at)}</span>
           <span>${truncateText(transcript.final_text || transcript.personalized_text || transcript.raw_text, 50)}</span>
@@ -853,6 +958,13 @@ function renderHistory() {
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
           </svg>
         </button>
+        <button class="icon-button move-btn" data-id="${transcript.id}" aria-label="Move to folder">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            <line x1="12" y1="11" x2="12" y2="17"></line>
+            <polyline points="9 14 12 11 15 14"></polyline>
+          </svg>
+        </button>
         <button class="icon-button delete-btn" data-id="${transcript.id}" aria-label="Delete recording">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="3 6 5 6 21 6"></polyline>
@@ -861,7 +973,7 @@ function renderHistory() {
         </button>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 
   // Add event listeners to buttons
   recordingsList.querySelectorAll('.play-btn').forEach(btn => {
@@ -876,9 +988,47 @@ function renderHistory() {
     btn.addEventListener('click', () => shareRecording(btn.dataset.id));
   });
 
+  recordingsList.querySelectorAll('.move-btn').forEach(btn => {
+    btn.addEventListener('click', () => openMoveFolderModal(btn.dataset.id));
+  });
+
   recordingsList.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', () => openDeleteModal(btn.dataset.id));
   });
+
+  // Select mode checkboxes
+  recordingsList.querySelectorAll('.select-checkbox input').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const id = e.target.closest('.select-checkbox').dataset.id;
+      if (e.target.checked) {
+        selectedIds.add(id);
+      } else {
+        selectedIds.delete(id);
+      }
+      updateSelectUI();
+    });
+  });
+
+  // In select mode, clicking the card row toggles the checkbox
+  if (selectMode) {
+    recordingsList.querySelectorAll('.recording-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        // Don't toggle if clicking the checkbox itself
+        if (e.target.closest('.select-checkbox')) return;
+        const id = item.dataset.id;
+        if (selectedIds.has(id)) {
+          selectedIds.delete(id);
+        } else {
+          selectedIds.add(id);
+        }
+        updateSelectUI();
+        renderHistory();
+      });
+    });
+  }
+
+  // Update disposable badge count
+  updateDisposableBadge();
 }
 
 /**
@@ -911,20 +1061,34 @@ function showHistoryEmpty() {
  * Switch between history and shared views
  */
 function switchRecordingsView(view) {
-  if (!viewHistoryBtn || !viewSharedBtn) return;
-
   currentRecordingsView = view;
 
-  // Update toggle button states
+  // Update all toggle button states
+  const allViewBtns = document.querySelectorAll('.view-toggle-btn');
+  allViewBtns.forEach(btn => btn.classList.remove('active'));
+
+  const activeBtn = document.querySelector(`[data-view="${view}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Hide all filter bars
+  if (sharedFilterBar) sharedFilterBar.style.display = 'none';
+  const folderFilterBar = document.getElementById('folderFilterBar');
+  if (folderFilterBar) folderFilterBar.style.display = 'none';
+  const disposableActionsBar = document.getElementById('disposableActionsBar');
+  if (disposableActionsBar) disposableActionsBar.style.display = 'none';
+
   if (view === 'history') {
-    viewHistoryBtn.classList.add('active');
-    viewSharedBtn.classList.remove('active');
     if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Your Recordings';
-    if (sharedFilterBar) sharedFilterBar.style.display = 'none';
     loadHistory();
-  } else {
-    viewHistoryBtn.classList.remove('active');
-    viewSharedBtn.classList.add('active');
+  } else if (view === 'folders') {
+    if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Folders';
+    if (folderFilterBar) folderFilterBar.style.display = 'block';
+    loadHistory();
+  } else if (view === 'disposable') {
+    if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Disposable Notes';
+    if (disposableActionsBar) disposableActionsBar.style.display = 'flex';
+    loadHistory();
+  } else if (view === 'shared') {
     if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Shared with Me';
     loadSharedRecordings();
   }
@@ -1415,6 +1579,10 @@ async function shareRecording(id) {
  */
 function openDeleteModal(id) {
   deleteTargetId = id;
+  const confirmInput = document.getElementById('deleteConfirmInput');
+  const confirmBtn = document.getElementById('confirmDelete');
+  if (confirmInput) confirmInput.value = '';
+  if (confirmBtn) confirmBtn.disabled = true;
   if (deleteModal) deleteModal.style.display = 'flex';
 }
 
@@ -1600,10 +1768,631 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ============================================
+// Folder Management
+// ============================================
+
+/**
+ * Load folders from API and populate selectors
+ */
+async function loadFolders() {
+  try {
+    const response = await authFetch(`${config.apiUrl}/folders`);
+    if (!response.ok) return;
+
+    const data = await response.json();
+    folders = data.folders || [];
+    populateFolderSelects();
+  } catch (error) {
+    console.error('Error loading folders:', error);
+  }
+}
+
+/**
+ * Populate folder dropdowns
+ */
+function populateFolderSelects() {
+  // Recording folder selector
+  if (folderSelect) {
+    const currentValue = folderSelect.value;
+    folderSelect.innerHTML = '<option value="">No Folder</option>';
+    folders.forEach(folder => {
+      const option = document.createElement('option');
+      option.value = folder.id;
+      option.textContent = folder.name;
+      folderSelect.appendChild(option);
+    });
+    // Restore selection if it still exists
+    if (currentValue && folders.find(f => f.id === currentValue)) {
+      folderSelect.value = currentValue;
+    }
+  }
+
+  // Folder filter in history view
+  const folderFilterSelect = document.getElementById('folderFilterSelect');
+  if (folderFilterSelect) {
+    const currentFilter = folderFilterSelect.value;
+    folderFilterSelect.innerHTML = '<option value="all">All Folders</option>';
+    folders.forEach(folder => {
+      const option = document.createElement('option');
+      option.value = folder.id;
+      option.textContent = folder.name;
+      folderFilterSelect.appendChild(option);
+    });
+    if (currentFilter) folderFilterSelect.value = currentFilter;
+  }
+}
+
+/**
+ * Create a new folder
+ */
+async function createFolder() {
+  const name = prompt('Enter folder name:');
+  if (!name || !name.trim()) return;
+
+  try {
+    const response = await authFetch(`${config.apiUrl}/folders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() })
+    });
+
+    if (!response.ok) throw new Error('Failed to create folder');
+
+    const data = await response.json();
+    folders.push(data.folder);
+    populateFolderSelects();
+
+    // Auto-select the new folder
+    if (folderSelect) {
+      folderSelect.value = data.folder.id;
+    }
+
+    showToast(`Folder "${data.folder.name}" created`);
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    showToast('Failed to create folder');
+  }
+}
+
+// ============================================
+// Disposable Notes
+// ============================================
+
+/**
+ * Update UI when disposable toggle changes
+ */
+function updateDisposableUI() {
+  const isDisposable = disposableCheckbox && disposableCheckbox.checked;
+  const recordBtn = document.getElementById('recordButton');
+  const folderSelectorEl = document.getElementById('folderSelector');
+
+  if (isDisposable) {
+    if (recordBtn) recordBtn.classList.add('disposable-mode');
+    if (folderSelectorEl) folderSelectorEl.style.opacity = '0.4';
+    if (folderSelectorEl) folderSelectorEl.style.pointerEvents = 'none';
+  } else {
+    if (recordBtn) recordBtn.classList.remove('disposable-mode');
+    if (folderSelectorEl) folderSelectorEl.style.opacity = '1';
+    if (folderSelectorEl) folderSelectorEl.style.pointerEvents = 'auto';
+  }
+
+  // Persist toggle state
+  localStorage.setItem('disposableMode', isDisposable ? 'true' : 'false');
+}
+
+/**
+ * Update disposable badge count
+ */
+function updateDisposableBadge() {
+  const badge = document.getElementById('disposableBadge');
+  if (!badge) return;
+
+  const count = transcripts.filter(t => t.is_disposable).length;
+  if (count > 0) {
+    badge.textContent = count;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+
+  // Update disposable actions bar count
+  const countEl = document.getElementById('disposableCount');
+  if (countEl) {
+    countEl.textContent = `${count} disposable note${count !== 1 ? 's' : ''}`;
+  }
+}
+
+/**
+ * Empty all disposable notes
+ */
+function openEmptyDisposableModal() {
+  const count = transcripts.filter(t => t.is_disposable).length;
+  if (count === 0) {
+    showToast('No disposable notes to delete');
+    return;
+  }
+
+  const msg = document.getElementById('emptyDisposableMessage');
+  if (msg) msg.textContent = `This will permanently delete ${count} disposable note${count !== 1 ? 's' : ''}.`;
+
+  const confirmInput = document.getElementById('emptyDisposableConfirmInput');
+  const confirmBtn = document.getElementById('confirmEmptyDisposable');
+  if (confirmInput) confirmInput.value = '';
+  if (confirmBtn) confirmBtn.disabled = true;
+
+  const modal = document.getElementById('emptyDisposableModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeEmptyDisposableModal() {
+  const modal = document.getElementById('emptyDisposableModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function confirmEmptyDisposable() {
+  const count = transcripts.filter(t => t.is_disposable).length;
+
+  try {
+    const response = await authFetch(`${config.apiUrl}/transcripts/disposable`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) throw new Error('Failed to delete');
+
+    closeEmptyDisposableModal();
+    showToast(`Deleted ${count} disposable note${count !== 1 ? 's' : ''}`);
+    loadHistory();
+  } catch (error) {
+    console.error('Error emptying disposable notes:', error);
+    showToast('Failed to delete disposable notes');
+  }
+}
+
+// ============================================
+// Recording Options Event Listeners
+// ============================================
+
+function setupRecordingOptionsListeners() {
+  // Add folder button
+  if (addFolderBtn) {
+    addFolderBtn.addEventListener('click', createFolder);
+  }
+
+  // Disposable toggle
+  if (disposableCheckbox) {
+    disposableCheckbox.addEventListener('change', updateDisposableUI);
+  }
+
+  // Empty disposable button
+  const emptyDisposableBtn = document.getElementById('emptyDisposableBtn');
+  if (emptyDisposableBtn) {
+    emptyDisposableBtn.addEventListener('click', openEmptyDisposableModal);
+  }
+
+  // Folder filter change
+  const folderFilterSelect = document.getElementById('folderFilterSelect');
+  if (folderFilterSelect) {
+    folderFilterSelect.addEventListener('change', renderHistory);
+  }
+
+  // View toggle: Folders
+  const viewFoldersBtn = document.getElementById('viewFoldersBtn');
+  if (viewFoldersBtn) {
+    viewFoldersBtn.addEventListener('click', () => switchRecordingsView('folders'));
+  }
+
+  // View toggle: Disposable
+  const viewDisposableBtn = document.getElementById('viewDisposableBtn');
+  if (viewDisposableBtn) {
+    viewDisposableBtn.addEventListener('click', () => switchRecordingsView('disposable'));
+  }
+}
+
+// ============================================
+// Folder Management (Rename, Delete)
+// ============================================
+
+let renameFolderTargetId = null;
+let deleteFolderTargetId = null;
+let moveTargetId = null;
+
+function openRenameFolderModal() {
+  const folderFilterSelect = document.getElementById('folderFilterSelect');
+  const selectedId = folderFilterSelect?.value;
+  if (!selectedId || selectedId === 'all') return;
+
+  const folder = folders.find(f => f.id === selectedId);
+  if (!folder) return;
+
+  renameFolderTargetId = selectedId;
+  const input = document.getElementById('renameFolderInput');
+  if (input) input.value = folder.name;
+
+  const modal = document.getElementById('renameFolderModal');
+  if (modal) modal.style.display = 'flex';
+  if (input) input.focus();
+}
+
+function closeRenameFolderModal() {
+  const modal = document.getElementById('renameFolderModal');
+  if (modal) modal.style.display = 'none';
+  renameFolderTargetId = null;
+}
+
+async function confirmRenameFolder() {
+  if (!renameFolderTargetId) return;
+
+  const input = document.getElementById('renameFolderInput');
+  const name = input?.value?.trim();
+  if (!name) {
+    showToast('Please enter a folder name');
+    return;
+  }
+
+  try {
+    const response = await authFetch(`${config.apiUrl}/folders/${renameFolderTargetId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+
+    if (!response.ok) throw new Error('Failed to rename folder');
+
+    showToast('Folder renamed');
+    closeRenameFolderModal();
+    await loadFolders();
+    renderHistory();
+  } catch (error) {
+    console.error('Error renaming folder:', error);
+    showToast('Failed to rename folder');
+  }
+}
+
+function openDeleteFolderModal() {
+  const folderFilterSelect = document.getElementById('folderFilterSelect');
+  const selectedId = folderFilterSelect?.value;
+  if (!selectedId || selectedId === 'all') return;
+
+  deleteFolderTargetId = selectedId;
+  const modal = document.getElementById('deleteFolderModal');
+  const confirmInput = document.getElementById('deleteFolderConfirmInput');
+  const confirmBtn = document.getElementById('confirmDeleteFolder');
+  if (confirmInput) confirmInput.value = '';
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeDeleteFolderModal() {
+  const modal = document.getElementById('deleteFolderModal');
+  if (modal) modal.style.display = 'none';
+  deleteFolderTargetId = null;
+}
+
+async function confirmDeleteFolder() {
+  if (!deleteFolderTargetId) return;
+
+  try {
+    const response = await authFetch(`${config.apiUrl}/folders/${deleteFolderTargetId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) throw new Error('Failed to delete folder');
+
+    showToast('Folder deleted');
+    closeDeleteFolderModal();
+
+    // Switch back to "All Folders"
+    const folderFilterSelect = document.getElementById('folderFilterSelect');
+    if (folderFilterSelect) folderFilterSelect.value = 'all';
+
+    await loadFolders();
+    await loadHistory();
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    showToast('Failed to delete folder');
+  }
+}
+
+// ============================================
+// Move Recording to Folder
+// ============================================
+
+function openMoveFolderModal(transcriptId) {
+  moveTargetId = transcriptId;
+
+  const select = document.getElementById('moveFolderSelect');
+  if (select) {
+    select.innerHTML = '<option value="">No Folder (Unfiled)</option>';
+    folders.forEach(folder => {
+      const option = document.createElement('option');
+      option.value = folder.id;
+      option.textContent = folder.name;
+      select.appendChild(option);
+    });
+
+    // Pre-select current folder
+    const transcript = transcripts.find(t => t.id === transcriptId);
+    if (transcript?.folder_id) {
+      select.value = transcript.folder_id;
+    }
+  }
+
+  const modal = document.getElementById('moveFolderModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeMoveFolderModal() {
+  const modal = document.getElementById('moveFolderModal');
+  if (modal) modal.style.display = 'none';
+  moveTargetId = null;
+}
+
+async function confirmMoveFolder() {
+  if (!moveTargetId) return;
+
+  const select = document.getElementById('moveFolderSelect');
+  const folderId = select?.value || null;
+
+  try {
+    const response = await authFetch(`${config.apiUrl}/transcripts/${moveTargetId}/move`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId })
+    });
+
+    if (!response.ok) throw new Error('Failed to move recording');
+
+    showToast(folderId ? 'Recording moved to folder' : 'Recording unfiled');
+    closeMoveFolderModal();
+    await loadHistory();
+  } catch (error) {
+    console.error('Error moving recording:', error);
+    showToast('Failed to move recording');
+  }
+}
+
+// ============================================
+// Folder Management Event Listeners
+// ============================================
+
+// ============================================
+// Multi-Select Mode
+// ============================================
+
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedIds.clear();
+
+  const btn = document.getElementById('selectModeBtn');
+  if (btn) btn.classList.toggle('active', selectMode);
+
+  updateSelectUI();
+  renderHistory();
+}
+
+function exitSelectMode() {
+  selectMode = false;
+  selectedIds.clear();
+
+  const btn = document.getElementById('selectModeBtn');
+  if (btn) btn.classList.remove('active');
+
+  updateSelectUI();
+  renderHistory();
+}
+
+function updateSelectUI() {
+  const bar = document.getElementById('bulkActionsBar');
+  const countEl = document.getElementById('bulkCount');
+
+  if (bar) bar.style.display = selectMode ? 'flex' : 'none';
+  if (countEl) countEl.textContent = `${selectedIds.size} selected`;
+
+  // Update card selected state without full re-render
+  document.querySelectorAll('.recording-item').forEach(item => {
+    const id = item.dataset.id;
+    const cb = item.querySelector('.select-checkbox input');
+    if (selectedIds.has(id)) {
+      item.classList.add('selected');
+      if (cb) cb.checked = true;
+    } else {
+      item.classList.remove('selected');
+      if (cb) cb.checked = false;
+    }
+  });
+}
+
+function bulkSelectAll() {
+  const recordingsList = document.getElementById('recordingsList');
+  if (!recordingsList) return;
+
+  recordingsList.querySelectorAll('.recording-item').forEach(item => {
+    selectedIds.add(item.dataset.id);
+  });
+  updateSelectUI();
+}
+
+function openBulkDeleteModal() {
+  if (selectedIds.size === 0) {
+    showToast('No recordings selected');
+    return;
+  }
+
+  const msg = document.getElementById('bulkDeleteMessage');
+  if (msg) msg.textContent = `This will permanently delete ${selectedIds.size} recording${selectedIds.size !== 1 ? 's' : ''}.`;
+
+  const confirmInput = document.getElementById('bulkDeleteConfirmInput');
+  const confirmBtn = document.getElementById('confirmBulkDelete');
+  if (confirmInput) confirmInput.value = '';
+  if (confirmBtn) confirmBtn.disabled = true;
+
+  const modal = document.getElementById('bulkDeleteModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeBulkDeleteModal() {
+  const modal = document.getElementById('bulkDeleteModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function confirmBulkDelete() {
+  const ids = [...selectedIds];
+  const count = ids.length;
+
+  try {
+    // Delete one by one (backend only supports single delete)
+    const results = await Promise.all(ids.map(id =>
+      authFetch(`${config.apiUrl}/transcripts/${id}`, { method: 'DELETE' })
+    ));
+
+    const failed = results.filter(r => !r.ok).length;
+
+    closeBulkDeleteModal();
+    exitSelectMode();
+
+    if (failed === 0) {
+      showToast(`Deleted ${count} recording${count !== 1 ? 's' : ''}`);
+    } else {
+      showToast(`Deleted ${count - failed} of ${count} recordings`);
+    }
+
+    await loadHistory();
+  } catch (error) {
+    console.error('Error bulk deleting:', error);
+    showToast('Failed to delete some recordings');
+  }
+}
+
+function setupFolderManagementListeners() {
+  // Show/hide folder manage buttons when filter changes
+  const folderFilterSelect = document.getElementById('folderFilterSelect');
+  if (folderFilterSelect) {
+    folderFilterSelect.addEventListener('change', () => {
+      const manageBtns = document.getElementById('folderManageBtns');
+      if (manageBtns) {
+        manageBtns.style.display = folderFilterSelect.value !== 'all' ? 'flex' : 'none';
+      }
+    });
+  }
+
+  // Rename folder
+  const renameFolderBtn = document.getElementById('renameFolderBtn');
+  if (renameFolderBtn) renameFolderBtn.addEventListener('click', openRenameFolderModal);
+
+  const closeRenameFolder = document.getElementById('closeRenameFolder');
+  if (closeRenameFolder) closeRenameFolder.addEventListener('click', closeRenameFolderModal);
+
+  const cancelRenameFolder = document.getElementById('cancelRenameFolder');
+  if (cancelRenameFolder) cancelRenameFolder.addEventListener('click', closeRenameFolderModal);
+
+  const confirmRenameFolderBtn = document.getElementById('confirmRenameFolder');
+  if (confirmRenameFolderBtn) confirmRenameFolderBtn.addEventListener('click', confirmRenameFolder);
+
+  // Allow Enter to confirm rename
+  const renameFolderInput = document.getElementById('renameFolderInput');
+  if (renameFolderInput) {
+    renameFolderInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirmRenameFolder();
+    });
+  }
+
+  // Delete folder
+  const deleteFolderBtn = document.getElementById('deleteFolderBtn');
+  if (deleteFolderBtn) deleteFolderBtn.addEventListener('click', openDeleteFolderModal);
+
+  const closeDeleteFolder = document.getElementById('closeDeleteFolder');
+  if (closeDeleteFolder) closeDeleteFolder.addEventListener('click', closeDeleteFolderModal);
+
+  const cancelDeleteFolder = document.getElementById('cancelDeleteFolder');
+  if (cancelDeleteFolder) cancelDeleteFolder.addEventListener('click', closeDeleteFolderModal);
+
+  const confirmDeleteFolderBtn = document.getElementById('confirmDeleteFolder');
+  if (confirmDeleteFolderBtn) confirmDeleteFolderBtn.addEventListener('click', confirmDeleteFolder);
+
+  // Delete folder confirm input
+  const deleteFolderConfirmInput = document.getElementById('deleteFolderConfirmInput');
+  if (deleteFolderConfirmInput) {
+    deleteFolderConfirmInput.addEventListener('input', () => {
+      const confirmBtn = document.getElementById('confirmDeleteFolder');
+      if (confirmBtn) confirmBtn.disabled = deleteFolderConfirmInput.value !== 'DELETE';
+    });
+  }
+
+  // Move to folder modal
+  const closeMoveFolder = document.getElementById('closeMoveFolder');
+  if (closeMoveFolder) closeMoveFolder.addEventListener('click', closeMoveFolderModal);
+
+  const cancelMoveFolder = document.getElementById('cancelMoveFolder');
+  if (cancelMoveFolder) cancelMoveFolder.addEventListener('click', closeMoveFolderModal);
+
+  const confirmMoveFolderBtn = document.getElementById('confirmMoveFolder');
+  if (confirmMoveFolderBtn) confirmMoveFolderBtn.addEventListener('click', confirmMoveFolder);
+
+  // Delete recording confirm input
+  const deleteConfirmInput = document.getElementById('deleteConfirmInput');
+  if (deleteConfirmInput) {
+    deleteConfirmInput.addEventListener('input', () => {
+      const confirmBtn = document.getElementById('confirmDelete');
+      if (confirmBtn) confirmBtn.disabled = deleteConfirmInput.value !== 'DELETE';
+    });
+  }
+
+  // Empty disposable modal
+  const closeEmptyDisposableBtn = document.getElementById('closeEmptyDisposable');
+  if (closeEmptyDisposableBtn) closeEmptyDisposableBtn.addEventListener('click', closeEmptyDisposableModal);
+
+  const cancelEmptyDisposableBtn = document.getElementById('cancelEmptyDisposable');
+  if (cancelEmptyDisposableBtn) cancelEmptyDisposableBtn.addEventListener('click', closeEmptyDisposableModal);
+
+  const confirmEmptyDisposableBtn = document.getElementById('confirmEmptyDisposable');
+  if (confirmEmptyDisposableBtn) confirmEmptyDisposableBtn.addEventListener('click', confirmEmptyDisposable);
+
+  const emptyDisposableConfirmInput = document.getElementById('emptyDisposableConfirmInput');
+  if (emptyDisposableConfirmInput) {
+    emptyDisposableConfirmInput.addEventListener('input', () => {
+      const confirmBtn = document.getElementById('confirmEmptyDisposable');
+      if (confirmBtn) confirmBtn.disabled = emptyDisposableConfirmInput.value !== 'DELETE';
+    });
+  }
+
+  // Select mode
+  const selectModeBtn = document.getElementById('selectModeBtn');
+  if (selectModeBtn) selectModeBtn.addEventListener('click', toggleSelectMode);
+
+  const bulkSelectAllBtn = document.getElementById('bulkSelectAll');
+  if (bulkSelectAllBtn) bulkSelectAllBtn.addEventListener('click', bulkSelectAll);
+
+  const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+  if (bulkDeleteBtn) bulkDeleteBtn.addEventListener('click', openBulkDeleteModal);
+
+  const bulkCancelBtn = document.getElementById('bulkCancelBtn');
+  if (bulkCancelBtn) bulkCancelBtn.addEventListener('click', exitSelectMode);
+
+  // Bulk delete modal
+  const closeBulkDeleteBtn = document.getElementById('closeBulkDelete');
+  if (closeBulkDeleteBtn) closeBulkDeleteBtn.addEventListener('click', closeBulkDeleteModal);
+
+  const cancelBulkDeleteBtn = document.getElementById('cancelBulkDelete');
+  if (cancelBulkDeleteBtn) cancelBulkDeleteBtn.addEventListener('click', closeBulkDeleteModal);
+
+  const confirmBulkDeleteBtn = document.getElementById('confirmBulkDelete');
+  if (confirmBulkDeleteBtn) confirmBulkDeleteBtn.addEventListener('click', confirmBulkDelete);
+
+  const bulkDeleteConfirmInput = document.getElementById('bulkDeleteConfirmInput');
+  if (bulkDeleteConfirmInput) {
+    bulkDeleteConfirmInput.addEventListener('input', () => {
+      const confirmBtn = document.getElementById('confirmBulkDelete');
+      if (confirmBtn) confirmBtn.disabled = bulkDeleteConfirmInput.value !== 'DELETE';
+    });
+  }
+}
+
 // Initialize when DOM is ready
 async function bootstrap() {
   await init();
   setupHistoryEventListeners();
+  setupFolderManagementListeners();
   await loadHistory();
 }
 

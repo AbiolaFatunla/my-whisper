@@ -538,7 +538,7 @@ async function handleMoveToShared(body) {
 }
 
 async function handleTranscribe(body, userId, headers) {
-  const { fileUrl } = body;
+  const { fileUrl, folderId, seriesId, isDisposable } = body;
 
   if (!fileUrl) {
     return errorResponse(400, 'File URL is required');
@@ -633,16 +633,36 @@ async function handleTranscribe(body, userId, headers) {
   if (supabase) {
     try {
       const id = `tr_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+      // Resolve series order if continuing a series
+      let resolvedSeriesOrder = null;
+      if (seriesId) {
+        const { data: seriesData } = await supabase
+          .from('transcripts')
+          .select('series_order')
+          .eq('user_id', userId)
+          .eq('series_id', seriesId)
+          .order('series_order', { ascending: false })
+          .limit(1);
+        resolvedSeriesOrder = (seriesData && seriesData.length > 0 ? seriesData[0].series_order : 0) + 1;
+      }
+
+      const insertData = {
+        id,
+        user_id: userId,
+        raw_text: rawText,
+        personalized_text: personalizedText,
+        audio_url: fileUrl,
+        title: generatedTitle
+      };
+      if (folderId) insertData.folder_id = folderId;
+      if (seriesId) insertData.series_id = seriesId;
+      if (resolvedSeriesOrder != null) insertData.series_order = resolvedSeriesOrder;
+      if (isDisposable) insertData.is_disposable = true;
+
       const { data, error } = await supabase
         .from('transcripts')
-        .insert({
-          id,
-          user_id: userId,
-          raw_text: rawText,
-          personalized_text: personalizedText,
-          audio_url: fileUrl,
-          title: generatedTitle
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -783,6 +803,127 @@ async function handleDeleteTranscript(id, userId) {
     return errorResponse(500, 'Failed to delete transcript');
   }
 
+  return jsonResponse(200, { success: true });
+}
+
+// ============================================
+// Folder Handlers
+// ============================================
+
+async function handleGetFolders(userId) {
+  if (!supabase) return errorResponse(500, 'Database not configured');
+
+  const { data, error } = await supabase
+    .from('folders')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  if (error) return errorResponse(500, 'Failed to fetch folders');
+  return jsonResponse(200, { folders: data || [] });
+}
+
+async function handleCreateFolder(body, userId) {
+  if (!supabase) return errorResponse(500, 'Database not configured');
+
+  const { name } = body;
+  if (!name || !name.trim()) return errorResponse(400, 'Folder name is required');
+
+  const id = `fl_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  const { data, error } = await supabase
+    .from('folders')
+    .insert({ id, user_id: userId, name: name.trim() })
+    .select()
+    .single();
+
+  if (error) return errorResponse(500, 'Failed to create folder');
+  return jsonResponse(200, { folder: data });
+}
+
+async function handleUpdateFolder(folderId, body, userId) {
+  if (!supabase) return errorResponse(500, 'Database not configured');
+
+  const { name } = body;
+  if (!name || !name.trim()) return errorResponse(400, 'Folder name is required');
+
+  const { data, error } = await supabase
+    .from('folders')
+    .update({ name: name.trim(), updated_at: new Date().toISOString() })
+    .eq('id', folderId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) return errorResponse(500, 'Failed to update folder');
+  return jsonResponse(200, { folder: data });
+}
+
+async function handleDeleteFolder(folderId, userId) {
+  if (!supabase) return errorResponse(500, 'Database not configured');
+
+  const { error } = await supabase
+    .from('folders')
+    .delete()
+    .eq('id', folderId)
+    .eq('user_id', userId);
+
+  if (error) return errorResponse(500, 'Failed to delete folder');
+  return jsonResponse(200, { success: true });
+}
+
+async function handleMoveTranscript(transcriptId, body, userId) {
+  if (!supabase) return errorResponse(500, 'Database not configured');
+
+  const { folderId } = body;
+  const { data, error } = await supabase
+    .from('transcripts')
+    .update({ folder_id: folderId || null, updated_at: new Date().toISOString() })
+    .eq('id', transcriptId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) return errorResponse(500, 'Failed to move transcript');
+  return jsonResponse(200, { transcript: data });
+}
+
+async function handleSetSeries(transcriptId, body, userId) {
+  if (!supabase) return errorResponse(500, 'Database not configured');
+
+  const sid = body.seriesId || `sr_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+  // Get next series order
+  const { data: seriesData } = await supabase
+    .from('transcripts')
+    .select('series_order')
+    .eq('user_id', userId)
+    .eq('series_id', sid)
+    .order('series_order', { ascending: false })
+    .limit(1);
+  const seriesOrder = (seriesData && seriesData.length > 0 ? seriesData[0].series_order : 0) + 1;
+
+  const { data, error } = await supabase
+    .from('transcripts')
+    .update({ series_id: sid, series_order: seriesOrder, updated_at: new Date().toISOString() })
+    .eq('id', transcriptId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) return errorResponse(500, 'Failed to set series');
+  return jsonResponse(200, { transcript: data, seriesId: sid });
+}
+
+async function handleDeleteDisposable(userId) {
+  if (!supabase) return errorResponse(500, 'Database not configured');
+
+  const { error } = await supabase
+    .from('transcripts')
+    .delete()
+    .eq('user_id', userId)
+    .eq('is_disposable', true);
+
+  if (error) return errorResponse(500, 'Failed to delete disposable notes');
   return jsonResponse(200, { success: true });
 }
 
@@ -2510,6 +2651,23 @@ exports.handler = async (event) => {
       return await handlePublicShare(shareMatch[1]);
     }
 
+    // Bulk delete disposable notes (must be before /transcripts/:id to avoid route conflict)
+    if (path === '/transcripts/disposable' && method === 'DELETE') {
+      return await handleDeleteDisposable(userId);
+    }
+
+    // Match /transcripts/:id/move
+    const transcriptMoveMatch = path.match(/^\/transcripts\/([^\/]+)\/move$/);
+    if (transcriptMoveMatch && method === 'PUT') {
+      return await handleMoveTranscript(transcriptMoveMatch[1], body, userId);
+    }
+
+    // Match /transcripts/:id/series
+    const transcriptSeriesMatch = path.match(/^\/transcripts\/([^\/]+)\/series$/);
+    if (transcriptSeriesMatch && method === 'POST') {
+      return await handleSetSeries(transcriptSeriesMatch[1], body, userId);
+    }
+
     // Match /transcripts/:id
     const transcriptMatch = path.match(/^\/transcripts\/([^\/]+)$/);
     if (transcriptMatch) {
@@ -2523,6 +2681,29 @@ exports.handler = async (event) => {
       }
       if (method === 'DELETE') {
         return await handleDeleteTranscript(id, userId);
+      }
+    }
+
+    // ============================================
+    // Folder Routes
+    // ============================================
+
+    if (path === '/folders' && method === 'GET') {
+      return await handleGetFolders(userId);
+    }
+
+    if (path === '/folders' && method === 'POST') {
+      return await handleCreateFolder(body, userId);
+    }
+
+    // Match /folders/:id
+    const folderMatch = path.match(/^\/folders\/([^\/]+)$/);
+    if (folderMatch) {
+      if (method === 'PUT') {
+        return await handleUpdateFolder(folderMatch[1], body, userId);
+      }
+      if (method === 'DELETE') {
+        return await handleDeleteFolder(folderMatch[1], userId);
       }
     }
 

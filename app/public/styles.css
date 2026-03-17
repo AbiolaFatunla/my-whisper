@@ -2769,3 +2769,519 @@ select:focus-visible {
   }
 }
 
+/* ============================================
+   Recording Options (Folder selector + Disposable toggle)
+   ============================================ */
+
+.recording-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.folder-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.folder-select {
+  padding: 6px 12px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  background: var(--bg-card, rgba(255,255,255,0.82));
+  color: var(--text-primary, #1a1a1a);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.folder-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full, 50%);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  background: var(--bg-card, rgba(255,255,255,0.82));
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.folder-add-btn:hover {
+  background: var(--primary, #f97316);
+  color: white;
+  border-color: var(--primary, #f97316);
+}
+
+/* Disposable toggle */
+.disposable-toggle-wrapper,
+.series-toggle-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.disposable-toggle,
+.series-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  user-select: none;
+}
+
+.disposable-toggle input,
+.series-toggle input {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--border-color, rgba(0,0,0,0.2));
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.3s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.disposable-toggle input:checked + .toggle-slider,
+.series-toggle input:checked + .toggle-slider {
+  background: var(--primary, #f97316);
+}
+
+.disposable-toggle input:checked + .toggle-slider::after,
+.series-toggle input:checked + .toggle-slider::after {
+  transform: translateX(16px);
+}
+
+.toggle-label {
+  color: var(--text-secondary, #666);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.disposable-toggle input:checked ~ .toggle-label {
+  color: var(--primary, #f97316);
+  font-weight: 600;
+}
+
+/* Disposable mode record button indicator */
+.record-button.disposable-mode {
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.3);
+}
+
+/* Disposable badge on view toggle */
+.disposable-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--primary, #f97316);
+  color: white;
+  font-size: 0.625rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.view-toggle-btn {
+  position: relative;
+}
+
+/* Disposable actions bar */
+.disposable-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: rgba(249, 115, 22, 0.08);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+.disposable-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #666);
+  font-weight: 500;
+}
+
+.button-small {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+}
+
+/* Folder filter bar */
+.folder-filter-bar {
+  margin-bottom: 12px;
+}
+
+.folder-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.folder-filter-row .filter-select {
+  flex: 1;
+}
+
+.folder-manage-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.folder-manage-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full, 50%);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  background: var(--bg-card, rgba(255,255,255,0.82));
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.folder-manage-btn:hover {
+  background: var(--primary, #f97316);
+  color: white;
+  border-color: var(--primary, #f97316);
+}
+
+.folder-manage-btn-danger:hover {
+  background: var(--danger-color, #ff006e);
+  color: white;
+  border-color: var(--danger-color, #ff006e);
+}
+
+/* Move button on recording cards */
+.icon-button.move-btn:hover {
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+/* Modal input */
+.modal-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary, #1a1a1a);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--primary, #f97316);
+}
+
+.modal-select {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+/* Delete confirmation input */
+.confirm-label {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #666);
+  margin-bottom: 8px;
+}
+
+.confirm-input {
+  font-family: monospace;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* Primary button */
+.button-primary {
+  background: var(--primary, #f97316);
+  color: white;
+}
+
+.button-primary:hover {
+  opacity: 0.9;
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Select mode toggle button */
+.select-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full, 50%);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.select-toggle-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.select-toggle-btn.active {
+  background: var(--primary, #f97316);
+  color: white;
+  border-color: var(--primary, #f97316);
+}
+
+/* Select mode checkbox on recording cards */
+.select-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.select-checkbox input {
+  display: none;
+}
+
+.select-checkbox .checkmark {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  background: var(--bg-card);
+}
+
+.select-checkbox input:checked + .checkmark {
+  background: var(--primary, #f97316);
+  border-color: var(--primary, #f97316);
+}
+
+.select-checkbox input:checked + .checkmark::after {
+  content: '';
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+
+/* Recording item in select mode */
+.recording-item.select-mode {
+  cursor: pointer;
+}
+
+.recording-item.select-mode .recording-actions {
+  display: none;
+}
+
+.recording-item.selected {
+  border-color: var(--primary, #f97316);
+  background: rgba(249, 115, 22, 0.05);
+}
+
+/* Bulk actions floating bar */
+.bulk-actions-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-xl, 0 20px 60px rgba(0,0,0,0.3));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+  animation: modalSlideIn 0.3s ease;
+}
+
+.bulk-count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.bulk-actions-btns {
+  display: flex;
+  gap: 8px;
+}
+
+/* Recording item folder/series badges */
+.recording-folder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.1);
+  color: var(--primary, #f97316);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.recording-series-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.recording-disposable-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.1);
+  color: var(--primary, #f97316);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.recording-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* Series group in folder view */
+.series-group {
+  border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.series-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.05);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.series-group-header:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.series-group-chevron {
+  transition: transform 0.2s;
+}
+
+.series-group.collapsed .series-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.series-group.collapsed .series-group-items {
+  display: none;
+}
+
+/* Move to folder dropdown in recording actions */
+.move-folder-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  min-width: 160px;
+  background: var(--bg-card, white);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 4px;
+}
+
+.move-folder-option {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--text-primary, #1a1a1a);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.move-folder-option:hover {
+  background: var(--bg-secondary, rgba(0,0,0,0.05));
+}
+
+.move-folder-option.active {
+  color: var(--primary, #f97316);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .recording-options {
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .folder-select {
+    min-width: 100px;
+    font-size: 0.75rem;
+  }
+
+  .toggle-label {
+    font-size: 0.75rem;
+  }
+}
+

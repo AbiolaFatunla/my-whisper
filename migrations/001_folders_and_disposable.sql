@@ -25,24 +25,15 @@ CREATE INDEX IF NOT EXISTS idx_transcripts_is_disposable ON transcripts(is_dispo
 -- 4. Enable RLS on folders table
 ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
 
--- 5. RLS policies for folders (users can only access their own folders)
-CREATE POLICY "Users can view their own folders"
-  ON folders FOR SELECT
-  USING (user_id = auth.uid());
+-- 5. RLS policies for folders (matches transcripts/corrections pattern)
+-- Policy 1: Anon role gets full access (server uses anon key for all operations)
+CREATE POLICY "Allow anon access for Lambda"
+  ON folders FOR ALL
+  TO anon
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY "Users can create their own folders"
-  ON folders FOR INSERT
-  WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "Users can update their own folders"
-  ON folders FOR UPDATE
-  USING (user_id = auth.uid());
-
-CREATE POLICY "Users can delete their own folders"
-  ON folders FOR DELETE
-  USING (user_id = auth.uid());
-
--- 6. Service role bypass policy (for API server using service key)
--- If your API uses the anon key with user JWT, the above policies are sufficient.
--- If using a service role key, you may need:
--- CREATE POLICY "Service role full access" ON folders FOR ALL USING (true);
+-- Policy 2: Authenticated users can access own folders (for direct client-side access)
+CREATE POLICY "Users can access own folders"
+  ON folders FOR ALL
+  USING (auth.uid() = user_id);

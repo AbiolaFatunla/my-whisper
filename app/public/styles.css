@@ -2937,6 +2937,51 @@ select:focus-visible {
 }
 
 /* Folder filter bar */
+/* Folder cards (All Folders browse view) */
+.folder-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.folder-card:hover {
+  box-shadow: var(--shadow-xl), 0 0 40px rgba(249, 115, 22, 0.3);
+  transform: translateY(-4px) scale(1.02);
+  border-color: var(--accent-color);
+}
+
+.folder-card-icon {
+  color: var(--primary, #f97316);
+  opacity: 0.8;
+  transition: var(--transition);
+}
+
+.folder-card:hover .folder-card-icon {
+  opacity: 1;
+}
+
+.folder-card-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+}
+
+.folder-card-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
 .folder-filter-bar {
   margin-bottom: 12px;
 }

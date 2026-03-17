@@ -891,9 +891,14 @@ function renderHistory() {
     displayTranscripts = transcripts.filter(t => t.is_disposable);
   } else if (currentRecordingsView === 'folders') {
     const selectedFolder = document.getElementById('folderFilterSelect')?.value;
-    if (selectedFolder && selectedFolder !== 'all') {
+    if (selectedFolder === 'all') {
+      // "All Folders" - render folder cards instead of recordings
+      renderFolderCards();
+      return;
+    } else if (selectedFolder && selectedFolder !== 'all-files') {
       displayTranscripts = transcripts.filter(t => t.folder_id === selectedFolder);
     } else {
+      // "All Files" - show everything except disposable
       displayTranscripts = transcripts.filter(t => !t.is_disposable);
     }
   } else if (currentRecordingsView === 'history') {
@@ -1032,6 +1037,69 @@ function renderHistory() {
 }
 
 /**
+ * Render folder cards in the main content area (for "All Folders" view)
+ */
+function renderFolderCards() {
+  if (!recordingsList) return;
+
+  historyLoading.style.display = 'none';
+  historyEmpty.style.display = 'none';
+
+  if (folders.length === 0) {
+    showHistoryEmpty();
+    return;
+  }
+
+  recordingsList.style.display = 'grid';
+  recordingsList.innerHTML = '';
+
+  folders.forEach(folder => {
+    const count = transcripts.filter(t => t.folder_id === folder.id).length;
+    const card = document.createElement('div');
+    card.className = 'folder-card';
+    card.dataset.id = folder.id;
+
+    const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    iconSvg.setAttribute('width', '32');
+    iconSvg.setAttribute('height', '32');
+    iconSvg.setAttribute('viewBox', '0 0 24 24');
+    iconSvg.setAttribute('fill', 'none');
+    iconSvg.setAttribute('stroke', 'currentColor');
+    iconSvg.setAttribute('stroke-width', '2');
+    const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    pathEl.setAttribute('d', 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z');
+    iconSvg.appendChild(pathEl);
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'folder-card-icon';
+    iconDiv.appendChild(iconSvg);
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'folder-card-name';
+    nameDiv.textContent = folder.name;
+
+    const countDiv = document.createElement('div');
+    countDiv.className = 'folder-card-count';
+    countDiv.textContent = count === 1 ? '1 recording' : count + ' recordings';
+
+    card.appendChild(iconDiv);
+    card.appendChild(nameDiv);
+    card.appendChild(countDiv);
+
+    card.addEventListener('click', () => {
+      const folderFilterSelect = document.getElementById('folderFilterSelect');
+      if (folderFilterSelect) {
+        folderFilterSelect.value = folder.id;
+        folderFilterSelect.dispatchEvent(new Event('change'));
+      }
+      renderHistory();
+    });
+
+    recordingsList.appendChild(card);
+  });
+}
+
+/**
  * Show history loading state
  */
 function showHistoryLoading() {
@@ -1083,6 +1151,11 @@ function switchRecordingsView(view) {
   } else if (view === 'folders') {
     if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Folders';
     if (folderFilterBar) folderFilterBar.style.display = 'block';
+    // Default to "All Folders" view when switching to this tab
+    const folderFilterSelect = document.getElementById('folderFilterSelect');
+    if (folderFilterSelect && !folderFilterSelect.value) folderFilterSelect.value = 'all';
+    const manageBtns = document.getElementById('folderManageBtns');
+    if (manageBtns) manageBtns.style.display = 'none';
     loadHistory();
   } else if (view === 'disposable') {
     if (recordingsSectionTitle) recordingsSectionTitle.textContent = 'Disposable Notes';
@@ -1812,7 +1885,16 @@ function populateFolderSelects() {
   const folderFilterSelect = document.getElementById('folderFilterSelect');
   if (folderFilterSelect) {
     const currentFilter = folderFilterSelect.value;
-    folderFilterSelect.innerHTML = '<option value="all">All Folders</option>';
+    // Clear and rebuild options safely
+    folderFilterSelect.replaceChildren();
+    const allFilesOpt = document.createElement('option');
+    allFilesOpt.value = 'all-files';
+    allFilesOpt.textContent = 'All Files';
+    folderFilterSelect.appendChild(allFilesOpt);
+    const allFoldersOpt = document.createElement('option');
+    allFoldersOpt.value = 'all';
+    allFoldersOpt.textContent = 'All Folders';
+    folderFilterSelect.appendChild(allFoldersOpt);
     folders.forEach(folder => {
       const option = document.createElement('option');
       option.value = folder.id;
@@ -2271,7 +2353,8 @@ function setupFolderManagementListeners() {
     folderFilterSelect.addEventListener('change', () => {
       const manageBtns = document.getElementById('folderManageBtns');
       if (manageBtns) {
-        manageBtns.style.display = folderFilterSelect.value !== 'all' ? 'flex' : 'none';
+        const isSpecificFolder = folderFilterSelect.value !== 'all' && folderFilterSelect.value !== 'all-files';
+        manageBtns.style.display = isSpecificFolder ? 'flex' : 'none';
       }
     });
   }

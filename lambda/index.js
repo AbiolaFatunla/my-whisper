@@ -7,6 +7,7 @@ const { S3Client, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand, GetO
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { createClient } = require('@supabase/supabase-js');
 const OpenAI = require('openai');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -829,7 +830,7 @@ async function handleCreateFolder(body, userId) {
   const { name } = body;
   if (!name || !name.trim()) return errorResponse(400, 'Folder name is required');
 
-  const id = `fl_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  const id = crypto.randomUUID();
   const { data, error } = await supabase
     .from('folders')
     .insert({ id, user_id: userId, name: name.trim() })
@@ -890,7 +891,7 @@ async function handleMoveTranscript(transcriptId, body, userId) {
 async function handleSetSeries(transcriptId, body, userId) {
   if (!supabase) return errorResponse(500, 'Database not configured');
 
-  const sid = body.seriesId || `sr_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  const sid = body.seriesId || crypto.randomUUID();
 
   // Get next series order
   const { data: seriesData } = await supabase

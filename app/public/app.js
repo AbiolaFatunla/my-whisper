@@ -963,6 +963,12 @@ function renderHistory() {
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
           </svg>
         </button>
+        <button class="icon-button series-btn" data-id="${transcript.id}" aria-label="Link to series">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+        </button>
         <button class="icon-button move-btn" data-id="${transcript.id}" aria-label="Move to folder">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -991,6 +997,10 @@ function renderHistory() {
 
   recordingsList.querySelectorAll('.share-btn').forEach(btn => {
     btn.addEventListener('click', () => shareRecording(btn.dataset.id));
+  });
+
+  recordingsList.querySelectorAll('.series-btn').forEach(btn => {
+    btn.addEventListener('click', () => openSeriesModal(btn.dataset.id));
   });
 
   recordingsList.querySelectorAll('.move-btn').forEach(btn => {
@@ -2235,6 +2245,128 @@ async function confirmMoveFolder() {
 }
 
 // ============================================
+// Link to Series
+// ============================================
+
+let seriesTargetId = null;
+
+function openSeriesModal(transcriptId) {
+  seriesTargetId = transcriptId;
+  const currentTranscript = transcripts.find(t => t.id === transcriptId);
+  if (!currentTranscript) return;
+
+  const list = document.getElementById('seriesPickerList');
+  if (!list) return;
+
+  // Build list of recordings the user can link to (exclude self)
+  const candidates = transcripts.filter(t => t.id !== transcriptId && !t.is_disposable);
+
+  list.replaceChildren();
+
+  if (candidates.length === 0) {
+    const emptyMsg = document.createElement('p');
+    emptyMsg.className = 'series-picker-empty';
+    emptyMsg.textContent = 'No other recordings to link with.';
+    list.appendChild(emptyMsg);
+  } else {
+    candidates.forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'series-picker-item';
+      if (currentTranscript.series_id && t.series_id === currentTranscript.series_id) {
+        item.classList.add('same-series');
+      }
+      item.dataset.id = t.id;
+      item.dataset.seriesId = t.series_id || '';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'series-picker-title';
+      let title = t.title || 'Untitled Recording';
+      if (t.series_order) title += ' \u2014 Part ' + t.series_order;
+      titleEl.textContent = title;
+
+      const metaEl = document.createElement('div');
+      metaEl.className = 'series-picker-meta';
+      const parts = [];
+      parts.push(formatDate(t.created_at));
+      const folder = folders.find(f => f.id === t.folder_id);
+      if (folder) parts.push(folder.name);
+      if (t.series_id) parts.push('Series');
+      metaEl.textContent = parts.join(' \u00b7 ');
+
+      item.appendChild(titleEl);
+      item.appendChild(metaEl);
+
+      item.addEventListener('click', () => {
+        list.querySelectorAll('.series-picker-item').forEach(i => i.classList.remove('selected'));
+        item.classList.add('selected');
+      });
+
+      list.appendChild(item);
+    });
+  }
+
+  // Update modal title context
+  const titleEl = document.getElementById('seriesModalTitle');
+  if (titleEl) titleEl.textContent = currentTranscript.title || 'Untitled Recording';
+
+  const modal = document.getElementById('seriesModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeSeriesModal() {
+  const modal = document.getElementById('seriesModal');
+  if (modal) modal.style.display = 'none';
+  seriesTargetId = null;
+}
+
+async function confirmLinkSeries() {
+  if (!seriesTargetId) return;
+
+  const list = document.getElementById('seriesPickerList');
+  const selected = list?.querySelector('.series-picker-item.selected');
+  if (!selected) {
+    showToast('Select a recording to link with');
+    return;
+  }
+
+  const linkedId = selected.dataset.id;
+  const existingSeriesId = selected.dataset.seriesId || null;
+
+  try {
+    // If the selected recording already has a series, join it.
+    // Otherwise, first put the selected recording into a new series, then add our recording.
+    let seriesId = existingSeriesId;
+
+    if (!seriesId) {
+      // Start a new series with the selected recording as Part 1
+      const res1 = await authFetch(`${config.apiUrl}/transcripts/${linkedId}/series`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res1.ok) throw new Error('Failed to start series');
+      const data1 = await res1.json();
+      seriesId = data1.seriesId;
+    }
+
+    // Now add our recording to that series
+    const res2 = await authFetch(`${config.apiUrl}/transcripts/${seriesTargetId}/series`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seriesId })
+    });
+    if (!res2.ok) throw new Error('Failed to link to series');
+
+    showToast('Linked to series');
+    closeSeriesModal();
+    await loadHistory();
+  } catch (error) {
+    console.error('Error linking series:', error);
+    showToast('Failed to link to series');
+  }
+}
+
+// ============================================
 // Folder Management Event Listeners
 // ============================================
 
@@ -2411,6 +2543,16 @@ function setupFolderManagementListeners() {
 
   const confirmMoveFolderBtn = document.getElementById('confirmMoveFolder');
   if (confirmMoveFolderBtn) confirmMoveFolderBtn.addEventListener('click', confirmMoveFolder);
+
+  // Series modal
+  const closeSeriesModalBtn = document.getElementById('closeSeriesModal');
+  if (closeSeriesModalBtn) closeSeriesModalBtn.addEventListener('click', closeSeriesModal);
+
+  const cancelSeriesModalBtn = document.getElementById('cancelSeriesModal');
+  if (cancelSeriesModalBtn) cancelSeriesModalBtn.addEventListener('click', closeSeriesModal);
+
+  const confirmSeriesModalBtn = document.getElementById('confirmSeriesModal');
+  if (confirmSeriesModalBtn) confirmSeriesModalBtn.addEventListener('click', confirmLinkSeries);
 
   // Delete recording confirm input
   const deleteConfirmInput = document.getElementById('deleteConfirmInput');

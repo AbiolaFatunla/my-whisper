@@ -1386,6 +1386,68 @@ body::before {
   max-width: 400px;
 }
 
+.modal-medium {
+  max-width: 520px;
+}
+
+/* Series picker modal */
+.series-modal-desc {
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.series-picker-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding-right: 4px;
+}
+
+.series-picker-item {
+  padding: 10px 14px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.series-picker-item:hover {
+  border-color: var(--primary, #f97316);
+}
+
+.series-picker-item.selected {
+  border-color: var(--primary, #f97316);
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.series-picker-item.same-series {
+  border-left: 3px solid #3b82f6;
+}
+
+.series-picker-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.series-picker-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.series-picker-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 24px 0;
+  font-size: 0.875rem;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;

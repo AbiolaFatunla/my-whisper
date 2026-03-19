@@ -45,9 +45,22 @@ See `plan.md` for full design spec.
 - [x] Multi-select mode — checkbox toggle button, click cards to select, floating action bar with Select All / Delete Selected / Cancel
 - [x] Bulk delete with "type DELETE" confirmation modal
 
+### Frontend — Mobile Parity (Phase 3)
+- [x] View tabs (History/Folders/Disposable) on history.html
+- [x] Folder filter dropdown with All Files / All Folders / specific folder
+- [x] Folder browse card view (clicking a folder card enters that folder)
+- [x] Folder badges, series badges, disposable badges on recording cards
+- [x] Series linking button + modal on recording cards
+- [x] Move-to-folder button + modal on recording cards
+- [x] Folder rename + delete modals
+- [x] Disposable actions bar with "Empty All" + confirmation modal
+- [x] Multi-select mode with bulk delete + confirmation modal
+- [x] "Type DELETE to confirm" pattern on all destructive actions
+- [x] All modal HTML synced between index.html and history.html
+
 ## Remaining / Future
 
-- [ ] Series linking after recording (retroactive series assignment UI)
+- [ ] Retroactive series linking UI (done on desktop, done on mobile)
 - [ ] Deploy and test on production Lambda
 - [ ] Run SQL migration in Supabase
 
